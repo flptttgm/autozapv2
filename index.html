@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- Preload critical font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600&display=swap"
+    as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600&display=swap">
+  </noscript>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- <link rel="icon" href="/favicon.ico?v=2" sizes="48x48" type="image/x-icon" /> -->
+  <link rel="icon" href="/favicon-48x48.png?v=2" sizes="48x48" type="image/png" />
+  <link rel="icon" href="/favicon.png?v=2" sizes="any" type="image/png" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#1a6b3f" />
+  <link rel="apple-touch-icon" href="/pwa-192x192.png?v=2" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="{a}AutoZap" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <title>{a}AutoZap - Automação de WhatsApp com IA | Chatbot e Atendimento Automático</title>
+  <meta name="description"
+    content="Automação de WhatsApp com inteligência artificial. Chatbot, atendimento automático 24/7, gestão de leads e agendamentos. Teste grátis por 48h." />
+  <meta name="author" content="Appi AutoZap" />
+  <meta name="keywords"
+    content="automação whatsapp, chatbot whatsapp, atendimento automático, whatsapp business, bot whatsapp, ia whatsapp, automação atendimento, whatsapp api" />
+
+  <meta property="og:title" content="AutoZap - Automação de WhatsApp com IA para Empresas" />
+  <meta property="og:description"
+    content="Automação inteligente de WhatsApp. Chatbot com IA, atendimento automático 24/7, captura de leads e agendamentos. Comece grátis!" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://appiautozap.com/og-image.png" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@AppiAutoZap" />
+  <meta name="twitter:image" content="https://appiautozap.com/og-image.png" />
+
+  <!-- Google Search Console Verification -->
+  <meta name="google-site-verification" content="zlmVRVtGxdpcYDmrzOG57SS68PNDh94cc6roqWNHMe8" />
+
+  <!-- Deferred Analytics - Loads after user interaction for better performance -->
+  <script>
+    (function () {
+      var trackingLoaded = false;
+
+      function loadTracking() {
+        if (trackingLoaded) return;
+        trackingLoaded = true;
+
+        // Google Analytics
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', 'G-EKM30YQJ99');
+
+        var gaScript = document.createElement('script');
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-EKM30YQJ99';
+        gaScript.async = true;
+        document.head.appendChild(gaScript);
+
+        // Google Ads
+        gtag('config', 'AW-17611077707');
+
+        var adsScript = document.createElement('script');
+        adsScript.src = 'https://www.googletagmanager.com/gtag/js?id=AW-17611077707';
+        adsScript.async = true;
+        document.head.appendChild(adsScript);
+
+        // Meta Pixel
+        !function (f, b, e, v, n, t, s) {
+          if (f.fbq) return; n = f.fbq = function () {
+            n.callMethod ?
+            n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+          };
+          if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+          n.queue = []; t = b.createElement(e); t.async = !0;
+          t.src = v; s = b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t, s)
+        }(window, document, 'script',
+          'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '3365012073661619');
+        fbq('track', 'PageView');
+      }
+
+      // Load on first user interaction (click, scroll, touch)
+      ['click', 'scroll', 'touchstart', 'mousemove', 'keydown'].forEach(function (event) {
+        document.addEventListener(event, loadTracking, { once: true, passive: true });
+      });
+
+      // Fallback: load after 4 seconds if no interaction
+      setTimeout(loadTracking, 4000);
+    })();
+  </script>
+</head>
+
+<body>
+  <!-- Meta Pixel noscript fallback -->
+  <noscript><img height="1" width="1" style="display:none"
+      src="https://www.facebook.com/tr?id=3365012073661619&ev=PageView&noscript=1" /></noscript>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

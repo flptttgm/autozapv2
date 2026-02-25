@@ -1,0 +1,493 @@
+import { ReactNode, useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, BrainCog, X, PanelLeftClose, Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { PlanBadge } from "@/components/subscription/PlanBadge";
+
+
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { AIChatSidebar } from "@/components/AIChatSidebar";
+import { SupportChatSidebar } from "@/components/SupportChatSidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Logo from "@/components/Logo";
+import { TrialBanner } from "@/components/TrialBanner";
+import { WhatsAppConnectionModal } from "@/components/WhatsAppConnectionModal";
+import { ConversationsSidebarItem } from "@/components/sidebar/ConversationsSidebarItem";
+import { LeadsSidebarItem } from "@/components/sidebar/LeadsSidebarItem";
+import { AppointmentsSidebarItem } from "@/components/sidebar/AppointmentsSidebarItem";
+import { WorkspaceSwitcher } from "@/components/sidebar/WorkspaceSwitcher";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { AIPromotionBanner } from "@/components/AIPromotionBanner";
+import { useSidebarVisibility } from "@/hooks/useSidebarVisibility";
+import { useUserWorkspaces } from "@/hooks/useUserWorkspaces";
+import { getWorkspaceTemplate } from "@/lib/workspaceTemplates";
+
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const Layout = ({ children }: LayoutProps) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const isMobile = useIsMobile();
+  const { isAppointmentsVisible, isQuotesVisible, isInvoicesVisible } = useSidebarVisibility();
+  const { activeWorkspace } = useUserWorkspaces();
+  const activeTemplate = getWorkspaceTemplate(activeWorkspace?.template);
+  const templateItems = activeTemplate.sidebarItems;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar-collapsed') === 'true';
+    }
+    return false;
+  });
+
+  // Persistir estado da sidebar no localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [supportChatOpen, setSupportChatOpen] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Close mobile sidebar on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer logout",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Logout realizado",
+        description: "Até logo!",
+      });
+      navigate("/auth");
+    }
+  };
+
+  // Navigation grouped for visual structure
+  const primaryNav = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutGrid },
+    { name: "Workspaces", href: "/workspaces", icon: Building2 },
+  ];
+
+  const toolsNav = [
+    { name: "Conexões", href: "/whatsapp", icon: Link2 },
+  ];
+
+  const agentsNav = { name: "Agentes", href: "/ai-settings", icon: BrainCog };
+
+  const systemNav = [
+    { name: "Configurações", href: "/settings", icon: Settings },
+  ];
+
+  const renderNavItem = (item: { name: string; href: string; icon: React.ElementType }) => {
+    const isActive = location.pathname === item.href ||
+      (item.href !== "/dashboard" && location.pathname.startsWith(item.href + "/"));
+    const linkContent = (
+      <Link
+        key={item.name}
+        to={item.href}
+        className={cn(
+          "flex items-center gap-3 rounded-md font-medium transition-all duration-200 ease-out group",
+          sidebarCollapsed && "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+          isActive
+            ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary px-4 py-3 text-[15px] scale-[1.02] shadow-sm dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+            : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground px-3 py-2.5 text-sm hover:scale-[1.01]"
+        )}
+      >
+        <item.icon className={cn(
+          "shrink-0 transition-all duration-200 ease-out",
+          sidebarCollapsed ? "lg:h-6 lg:w-6 h-5 w-5 lg:group-hover:scale-110" : isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
+        )} />
+        <span className={cn(
+          "transition-all duration-200",
+          sidebarCollapsed && "lg:hidden"
+        )}>{item.name}</span>
+      </Link>
+    );
+
+    if (sidebarCollapsed) {
+      return (
+        <Tooltip key={item.name}>
+          <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right" className="hidden lg:block">{item.name}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return linkContent;
+  };
+
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div className="flex flex-col h-screen overflow-hidden bg-background">
+        <TrialBanner />
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Mobile Overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[45] lg:hidden"
+              style={{ top: 'var(--top-banner-height, 0px)' }}
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar */}
+          <aside
+            className={cn(
+              "shrink-0 border-r border-border transition-all duration-300 will-change-transform z-[55]",
+              "bg-card/95 supports-[backdrop-filter]:bg-card/60 backdrop-blur-xl dark:bg-card/20 dark:border-white/5",
+              "flex flex-col overflow-x-hidden",
+              sidebarCollapsed ? "lg:overflow-y-auto lg:scrollbar-hide" : "overflow-y-auto",
+              // Mobile/Tablet: fixed overlay; Desktop: relative
+              "fixed lg:relative lg:translate-x-0 lg:top-0",
+              sidebarOpen ? "translate-x-0" : "-translate-x-full",
+              // Mobile/Tablet: leave space for bottom nav and add rounded corner
+              "rounded-br-2xl shadow-xl lg:rounded-none lg:shadow-none",
+              // Height: fixed on mobile/tablet (max-h restricted), full height on desktop flex
+              "h-screen lg:h-full",
+              // Desktop: collapsible width
+              sidebarCollapsed ? "lg:w-20" : "lg:w-64",
+              "w-64"
+            )}
+            style={{
+              // Only apply top offset on fixed screens (less than lg: 1024px)
+              top: !isMobile && typeof window !== 'undefined' && window.innerWidth >= 1024 ? '0' : 'var(--top-banner-height, 0px)',
+              maxHeight: isMobile
+                ? 'calc(100vh - var(--top-banner-height, 0px) - var(--mobile-bottom-nav-height, 80px))'
+                : !isMobile && typeof window !== 'undefined' && window.innerWidth < 1024 // Tablet case (fixed but not isMobile)
+                  ? 'calc(100vh - var(--top-banner-height, 0px))'
+                  : '100%' // Desktop relative
+            }}
+          >
+            <div className={cn(
+              "flex flex-col h-full transition-transform duration-300",
+              !sidebarCollapsed && "scale-[0.95] origin-top"
+            )}>
+              <div className={cn("p-4", sidebarCollapsed ? "lg:px-3 lg:py-5" : "p-6")}>
+                {sidebarCollapsed ? (
+                  <div
+                    className="hidden lg:flex justify-center items-center h-12 cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSidebarCollapsed(false)}
+                  >
+                    <span className="font-funnel font-bold text-[33px] text-primary">{"{a}"}</span>
+                  </div>
+                ) : null}
+                <div
+                  className={cn(
+                    "flex items-center justify-between cursor-pointer group rounded-lg transition-colors p-1 -m-1 hover:bg-muted/50",
+                    sidebarCollapsed && "lg:hidden"
+                  )}
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      setSidebarOpen(false);
+                    } else {
+                      setSidebarCollapsed(true);
+                    }
+                  }}
+                >
+                  <Logo size="md" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hidden lg:inline-flex h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity items-center justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                        setSidebarCollapsed(true);
+                      }
+                    }}
+                  >
+                    <PanelLeftClose className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Workspace Switcher — hidden when collapsed (shown in header instead) */}
+              {!sidebarCollapsed && (
+                <div className="pb-2">
+                  <div className="px-4 pb-1">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Workspace Atual
+                    </span>
+                  </div>
+                  <WorkspaceSwitcher collapsed={false} />
+                </div>
+              )}
+
+              <nav className={cn(
+                "space-y-1 flex-1",
+                sidebarCollapsed ? "lg:px-3" : "px-3",
+                "px-3"
+              )}>
+                {/* Primary Navigation: Dashboard + Workspaces (only on principal workspace) */}
+                {!activeWorkspace?.template && primaryNav.map(renderNavItem)}
+
+                {/* Template-specific items */}
+                {templateItems.length > 0 && (
+                  <>
+                    {!sidebarCollapsed && (
+                      <div className="pt-4 pb-1 px-1">
+                        <span className={cn(
+                          "text-[10px] font-semibold uppercase tracking-wider",
+                          activeTemplate.color
+                        )}>
+                          {activeTemplate.name}
+                        </span>
+                      </div>
+                    )}
+                    {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+                    {templateItems.map(renderNavItem)}
+                  </>
+                )}
+
+                {/* Separator */}
+                {templateItems.length > 0 && !sidebarCollapsed && (
+                  <div className="pt-3 pb-1 px-1">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Geral
+                    </span>
+                  </div>
+                )}
+                {templateItems.length > 0 && sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+
+                {/* Agentes - logo após Dashboard */}
+                {renderNavItem(agentsNav)}
+
+                {/* Leads with dropdown - force expanded on mobile overlay */}
+                <LeadsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+
+                {/* Conversations with dropdown - force expanded on mobile overlay */}
+                <ConversationsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+
+                {/* Appointments with dropdown - force expanded on mobile overlay */}
+                {isAppointmentsVisible && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
+
+                {/* Orçamentos */}
+                {isQuotesVisible && renderNavItem({ name: "Orçamentos", href: "/quotes", icon: FileText })}
+
+                {/* Cobranças */}
+                {isInvoicesVisible && renderNavItem({ name: "Cobranças", href: "/invoices", icon: Receipt })}
+
+                {/* Tools Navigation: Conexões WhatsApp */}
+                {toolsNav.map(renderNavItem)}
+              </nav>
+
+              {/* Bottom section - using mt-auto to push to bottom */}
+              <div className={cn("mt-auto", isMobile ? "pb-4" : "pb-6")}>
+
+                {/* Separator: SUPORTE E AJUSTES */}
+                <div className={cn("pb-2", sidebarCollapsed && "lg:hidden", "px-3")}>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Suporte e Ajustes
+                  </span>
+                </div>
+                {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-3 mb-2" />}
+
+                {/* Suporte, Indicações, Configurações */}
+                <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3 space-y-1 mb-4")}>
+                  {/* Support Button */}
+                  {sidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => {
+                            setSidebarOpen(false);
+                            setSupportChatOpen(!supportChatOpen);
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
+                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                            "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                          )}
+                        >
+                          <MessageSquareText className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                          <span className="lg:hidden">Suporte</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSidebarOpen(false);
+                        setSupportChatOpen(!supportChatOpen);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                        "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                      )}
+                    >
+                      <MessageSquareText className="h-5 w-5 shrink-0" />
+                      <span>Suporte</span>
+                    </button>
+                  )}
+
+                  {/* Indicações Link */}
+                  {sidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to="/indicacao"
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
+                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                            location.pathname === "/indicacao"
+                              ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                              : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                          )}
+                        >
+                          <Share2 className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                          <span className="lg:hidden">Indicações</span>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Link
+                      to="/indicacao"
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                        location.pathname === "/indicacao"
+                          ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                          : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                      )}
+                    >
+                      <Share2 className="h-5 w-5 shrink-0" />
+                      <span>Indicações</span>
+                    </Link>
+                  )}
+
+                  {/* Configurações */}
+                  {systemNav.map(renderNavItem)}
+                </div>
+
+                {/* PlanBadge */}
+                <div className={cn(sidebarCollapsed && "lg:hidden")}>
+                  <PlanBadge />
+                </div>
+
+                {/* Botão Sair */}
+                <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3")}>
+                  {sidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="hidden lg:flex w-14 h-14 mx-auto group"
+                          onClick={handleLogout}
+                        >
+                          <LogOut className="h-6 w-6 transition-transform duration-200 group-hover:scale-110" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Sair</TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start gap-3", sidebarCollapsed && "lg:hidden")}
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Sair
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <main
+            className="flex-1 flex flex-col transition-all duration-300 min-h-0"
+          >
+            {/* Header - hidden on mobile */}
+            {!isMobile && (
+              <DashboardHeader
+                onToggleAIChat={() => setAiChatOpen(!aiChatOpen)}
+                aiChatOpen={aiChatOpen}
+                onToggleMobileSidebar={() => setSidebarOpen(!sidebarOpen)}
+                sidebarCollapsed={sidebarCollapsed}
+              />
+            )}
+
+            {/* Mobile Header - apenas páginas internas (não dashboard) */}
+            {isMobile && location.pathname !== '/' && location.pathname !== '/dashboard' && (
+              <div className="flex items-center justify-end px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <Logo size="sm" />
+              </div>
+            )}
+            <div
+              ref={scrollContainerRef}
+              data-main-scroll
+              className={cn(
+                "flex-1 min-h-0",
+                "overflow-y-auto overflow-x-hidden",
+              )}
+              style={{
+                maxWidth: '100vw',
+                boxSizing: 'border-box',
+              }}
+            >
+              {children}
+              {/* Spacer para mobile - páginas com altura fixa (conversations, appointments) gerenciam seu próprio layout */}
+              {isMobile && !location.pathname.startsWith('/conversations') && (
+                <div className="h-40 shrink-0" aria-hidden="true" />
+              )}
+            </div>
+          </main>
+
+          {/* Mobile Bottom Navigation */}
+          <MobileBottomNav
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            sidebarOpen={sidebarOpen}
+            visiblePages={{
+              appointments: isAppointmentsVisible,
+              quotes: isQuotesVisible
+            }}
+          />
+
+          {/* AI Chat Sidebar */}
+          <AIChatSidebar isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+
+          {/* Support Chat Sidebar */}
+          <SupportChatSidebar isOpen={supportChatOpen} onClose={() => setSupportChatOpen(false)} />
+
+          {/* WhatsApp Connection Modal */}
+          <WhatsAppConnectionModal />
+
+          {/* AI Promotion Banner */}
+          <AIPromotionBanner onOpenAIChat={() => setAiChatOpen(true)} />
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+};
+
+export default Layout;

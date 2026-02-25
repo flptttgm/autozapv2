@@ -1,0 +1,38 @@
+# AutoZap - Robots.txt
+# https://appiautozap.com
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: *
+Allow: /
+
+# Bloquear áreas privadas e administrativas
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /checkout
+Disallow: /trial-expired
+Disallow: /conversations
+Disallow: /leads
+Disallow: /appointments
+Disallow: /whatsapp
+Disallow: /notifications
+Disallow: /ai-settings
+Disallow: /estatisticas
+Disallow: /auth
+Disallow: /accept-invite
+Disallow: /calendar-callback
+
+# Sitemap para indexação
+Sitemap: https://appiautozap.com/sitemap.xml
