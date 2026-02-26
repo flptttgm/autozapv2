@@ -45,7 +45,7 @@ export function MobileDashboardHero({
   const { profile } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  
+
   const stats: StatItem[] = [
     {
       id: "response-rate",
@@ -78,7 +78,7 @@ export function MobileDashboardHero({
   // Auto-rotate every 5 seconds
   useEffect(() => {
     if (isPaused) return;
-    
+
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % stats.length);
     }, 5000);
@@ -102,7 +102,7 @@ export function MobileDashboardHero({
     setIsPaused(true);
     setTimeout(() => setIsPaused(false), 10000);
   }, [stats.length]);
-  
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Bom dia";
@@ -116,9 +116,9 @@ export function MobileDashboardHero({
   const { theme, setTheme } = useTheme();
 
   return (
-    <div 
+    <div
       className="relative overflow-hidden mb-5 rounded-b-3xl shadow-lg"
-      style={{ 
+      style={{
         paddingTop: 'env(safe-area-inset-top, 0px)',
         minHeight: '420px',
         width: '100vw',
@@ -127,34 +127,30 @@ export function MobileDashboardHero({
       }}
     >
       {/* Background Image */}
-      <div 
+      <div
         className="absolute inset-0"
-        style={{ 
+        style={{
           backgroundImage: `url(${heroBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center center',
           filter: 'brightness(0.7) saturate(1.2)',
         }}
       />
-      
+
       {/* Green overlay with blend mode */}
-      <div 
+      <div
         className="absolute inset-0"
         style={{
           background: 'linear-gradient(180deg, rgba(20, 90, 50, 0.9) 0%, rgba(30, 150, 80, 0.8) 50%, rgba(37, 211, 102, 0.85) 100%)',
           mixBlendMode: 'multiply',
         }}
       />
-      
+
       {/* Additional gradient for depth */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/30" />
-      
-        {/* Decorative elements - contained to prevent visual bleed */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="absolute top-16 right-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 left-0 w-36 h-36 bg-white/5 rounded-full blur-2xl" />
-        </div>
-      
+
+      {/* Removed decorative elements */}
+
       {/* Content */}
       <div className="relative z-10 px-6 pt-5 pb-6 flex flex-col h-full" style={{ minHeight: '420px' }}>
         {/* Top Bar */}
@@ -175,15 +171,13 @@ export function MobileDashboardHero({
           {/* Status Badge - Red pulse when disconnected */}
           <Badge
             variant="outline"
-            className={`text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border ${
-              whatsappStatus
+            className={`text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border ${whatsappStatus
                 ? "bg-white/15 text-white border-white/30"
                 : "bg-red-500/90 text-white border-red-400/60"
-            }`}
+              }`}
           >
-            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-              whatsappStatus ? "bg-green-400 animate-pulse" : "bg-white animate-pulse"
-            }`} />
+            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${whatsappStatus ? "bg-green-400 animate-pulse" : "bg-white animate-pulse"
+              }`} />
             {whatsappStatus ? "Ativo" : "Offline"}
           </Badge>
         </div>
@@ -197,25 +191,25 @@ export function MobileDashboardHero({
             {firstName} 👋
           </h1>
         </div>
-        
+
         {/* Main Metric - Centered Large Display */}
-        <div 
+        <div
           className="flex-1 flex flex-col items-center justify-center"
           onTouchStart={(e) => {
             const touch = e.touches[0];
             const startX = touch.clientX;
-            
+
             const handleTouchEnd = (endEvent: TouchEvent) => {
               const endX = endEvent.changedTouches[0].clientX;
               const diff = startX - endX;
-              
+
               if (Math.abs(diff) > 50) {
                 handleSwipe(diff > 0 ? "left" : "right");
               }
-              
+
               document.removeEventListener("touchend", handleTouchEnd);
             };
-            
+
             document.addEventListener("touchend", handleTouchEnd);
           }}
         >
@@ -235,22 +229,21 @@ export function MobileDashboardHero({
                   {currentStat.label}
                 </span>
               </div>
-              
+
               {/* Large Value */}
               <div className="flex items-center justify-center gap-3">
                 <span className="text-white text-6xl font-bold tracking-tight drop-shadow-xl">
                   {currentStat.value}{currentStat.suffix || ""}
                 </span>
-                
+
                 {/* Trend indicator */}
                 {currentStat.showTrend && (
-                  <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold ${
-                    responseRateTrend === "up" 
-                      ? "bg-green-500/30 text-green-200" 
+                  <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold ${responseRateTrend === "up"
+                      ? "bg-green-500/30 text-green-200"
                       : responseRateTrend === "down"
-                      ? "bg-red-500/40 text-red-200"
-                      : "bg-white/20 text-white/80"
-                  }`}>
+                        ? "bg-red-500/40 text-red-200"
+                        : "bg-white/20 text-white/80"
+                    }`}>
                     {responseRateTrend === "up" ? (
                       <TrendingUp className="w-3.5 h-3.5" />
                     ) : responseRateTrend === "down" ? (
@@ -270,11 +263,10 @@ export function MobileDashboardHero({
             <button
               key={stat.id}
               onClick={() => handleDotClick(index)}
-              className={`transition-all duration-300 rounded-full ${
-                index === currentIndex
+              className={`transition-all duration-300 rounded-full ${index === currentIndex
                   ? "w-6 h-1.5 bg-white"
                   : "w-1.5 h-1.5 bg-white/40 hover:bg-white/60"
-              }`}
+                }`}
               aria-label={`Ver ${stat.label}`}
             />
           ))}

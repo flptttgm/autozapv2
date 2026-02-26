@@ -142,15 +142,7 @@ const Workspaces = () => {
                     description: `Workspace de ${template}`,
                 } as any);
 
-            // 4. Create trial subscription
-            await supabase
-                .from("subscriptions")
-                .insert({
-                    workspace_id: workspace.id,
-                    plan_type: "trial",
-                    status: "active",
-                    trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                });
+
 
             return workspace;
         },

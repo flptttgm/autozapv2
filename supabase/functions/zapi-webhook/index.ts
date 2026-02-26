@@ -39,7 +39,7 @@ serve(async (req: Request) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       );
 
-      const phone = payload.phone;
+      let phone = payload.phone;
       const messageId = payload.messageId;
       const instanceId = payload.instanceId;
 
@@ -128,6 +128,27 @@ serve(async (req: Request) => {
       const workspaceId = instance.workspace_id;
       await supabaseDebug.from('debug_logs').insert({ data: { step: 'workspace_resolved', workspaceId } });
 
+      // 1b. Resolve @lid to real phone number (View-Once media bug)
+      if (phone && phone.includes('@lid')) {
+        console.log(`[zapi-webhook] Received @lid phone: ${phone}, attempting to resolve to actual phone number`);
+        const { data: lidMatch } = await supabase
+          .from('messages')
+          .select('chat_id')
+          .eq('workspace_id', workspaceId)
+          .not('chat_id', 'like', '%@lid%')
+          .contains('metadata', { zapi_payload: { chatLid: phone } })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lidMatch && lidMatch.chat_id) {
+          console.log(`[zapi-webhook] Successfully resolved @lid ${phone} to real phone ${lidMatch.chat_id}`);
+          phone = lidMatch.chat_id;
+        } else {
+          console.log(`[zapi-webhook] Could not resolve @lid ${phone}, proceeding with @lid`);
+        }
+      }
+
       // 2. Find or Create Lead
       console.log('[zapi-webhook] Processing lead for phone:', phone);
 
@@ -141,12 +162,16 @@ serve(async (req: Request) => {
 
       const isNewLead = !existingLead;
 
+      const leadName = payload.isGroup
+        ? (payload.chatName || 'Grupo')
+        : (payload.senderName || payload.chatName || payload.pushName || 'Novo Cliente');
+
       const { data: lead, error: leadError } = await supabase
         .from('leads')
         .upsert({
           workspace_id: workspaceId,
           phone: phone,
-          name: payload.senderName || payload.chatName || payload.pushName || 'Novo Cliente',
+          name: leadName,
         }, { onConflict: 'workspace_id, phone' })
         .select('id, name, avatar_url')
         .single();
@@ -167,14 +192,14 @@ serve(async (req: Request) => {
 
       await supabaseDebug.from('debug_logs').insert({ data: { step: 'lead_processed', leadId: lead.id } });
 
-      // 2b. Save contact profile picture from Z-API payload (if not already saved)
+      // 2b. Save/Update contact profile picture from Z-API payload
       const contactPhoto = payload.photo || payload.imgUrl || null;
-      if (contactPhoto && !lead.avatar_url) {
+      if (contactPhoto && contactPhoto !== lead.avatar_url) {
         await supabase
           .from('leads')
           .update({ avatar_url: contactPhoto })
           .eq('id', lead.id);
-        console.log('[zapi-webhook] Profile picture saved for lead:', lead.id);
+        console.log('[zapi-webhook] Profile picture updated for lead:', lead.id);
       }
 
       // 3. Insert Inbound Message

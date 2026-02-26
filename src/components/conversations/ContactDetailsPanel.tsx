@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import {
   Phone,
   Mail,
@@ -314,12 +315,15 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
   const leadPhoto = (lead as any).avatar_url || metadata?.photo;
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-card/40 backdrop-blur-xl border-l border-white/5 relative overflow-hidden">
       {/* Header with close button */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <span className="font-semibold text-sm">Detalhes do Contato</span>
+      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-md relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-1 bg-primary rounded-full" />
+          <span className="font-semibold text-sm tracking-tight text-foreground/90">Detalhes do Contato</span>
+        </div>
         {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-white/10 transition-colors">
             <X className="h-4 w-4" />
           </Button>
         )}
@@ -329,23 +333,28 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
         <div className="p-4 space-y-6">
           {/* Avatar and Name Section */}
           <div
-            className="flex flex-col items-center text-center space-y-3 cursor-pointer group"
+            className="flex flex-col items-center text-center space-y-4 cursor-pointer group relative pt-4"
             onClick={() => navigate(`/leads/${lead.id}`)}
           >
-            <Avatar className="h-20 w-20 ring-2 ring-transparent group-hover:ring-primary/50 transition-all">
-              {leadPhoto ? (
-                <AvatarImage src={leadPhoto} alt={displayName} />
-              ) : null}
-              <AvatarFallback className={`${getAvatarColor(displayName)} text-white text-xl font-semibold`}>
-                {getInitials(displayName)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{displayName}</h3>
+            {/* Interactive avatar wrapper */}
+            <div className="relative">
+              <Avatar className="h-24 w-24 ring-2 ring-white/10 group-hover:ring-primary/50 group-hover:scale-105 transition-all duration-300 shadow-xl relative z-10">
+                {leadPhoto ? (
+                  <AvatarImage src={leadPhoto} alt={displayName} className="object-cover" />
+                ) : null}
+                <AvatarFallback className={`${getAvatarColor(displayName)} text-white text-2xl font-bold`}>
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-semibold text-lg group-hover:text-primary transition-colors tracking-tight">{displayName}</h3>
               {lead.score !== null && lead.score !== undefined && (
-                <p className="text-sm text-muted-foreground">
-                  Score: {lead.score}%
-                </p>
+                <div className="inline-flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  <span className="text-xs font-medium text-muted-foreground">Score</span>
+                  <span className="text-xs font-bold text-emerald-400">{lead.score}%</span>
+                </div>
               )}
             </div>
           </div>
@@ -356,7 +365,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 transition-all"
                 onClick={() => window.open(`mailto:${lead.email}`, '_self')}
               >
                 <Mail className="h-4 w-4" />
@@ -365,13 +374,16 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
             )}
           </div>
 
-          <Separator />
+          <Separator className="bg-white/5" />
 
           {/* Contact Details Section */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Detalhes do Contato
-            </h4>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                Sobre
+              </span>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
 
             <div className="space-y-2">
               <div className="flex items-center gap-3 text-sm">
@@ -406,18 +418,20 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-white/5" />
 
           {/* Tags Section */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Tags
-              </h4>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                  Tags & Status
+                </span>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs gap-1"
+                className="h-6 text-[10px] gap-1 px-2 hover:bg-white/10 border border-transparent hover:border-white/10 transition-all rounded-md"
                 onClick={() => setShowAddTagDialog(true)}
               >
                 <Plus className="h-3 w-3" />
@@ -447,18 +461,20 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-white/5" />
 
           {/* Notes Section */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Anotações
-              </h4>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                  Anotações
+                </span>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs gap-1"
+                className="h-6 text-[10px] gap-1 px-2 hover:bg-white/10 border border-transparent hover:border-white/10 transition-all rounded-md"
                 onClick={() => setShowAddNoteDialog(true)}
               >
                 <Plus className="h-3 w-3" />
@@ -466,13 +482,14 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
               </Button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {notes.length > 0 ? (
                 [...notes].reverse().map((note: { content: string; date: string }, index: number) => (
-                  <div key={index} className="bg-muted/50 rounded-lg p-3 text-sm">
-                    <p className="whitespace-pre-wrap break-words">{note.content}</p>
-                    <span className="text-xs text-muted-foreground mt-1 block">
-                      {format(new Date(note.date), "dd/MM/yyyy HH:mm")}
+                  <div key={index} className="bg-white/5 border border-white/5 hover:border-white/10 transition-colors rounded-xl p-3.5 text-sm group/note relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 group-hover/note:bg-primary transition-colors" />
+                    <p className="whitespace-pre-wrap break-words text-foreground/90 pl-1">{note.content}</p>
+                    <span className="text-[10px] font-medium text-muted-foreground mt-2 block pl-1">
+                      {format(new Date(note.date), "dd/MM/yyyy • HH:mm")}
                     </span>
                   </div>
                 ))
@@ -486,45 +503,51 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-white/5" />
 
           {/* Timeline Section */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Timeline
-            </h4>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                Histórico
+              </span>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
 
             {timelineEvents.length > 0 ? (
-              <div className="relative">
-                {/* Vertical line */}
-                <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border" />
+              <div className="relative pl-2">
+                {/* Vertical line with subtle gradient */}
+                <div className="absolute left-[19px] top-6 bottom-4 w-px bg-gradient-to-b from-border via-border to-transparent" />
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {timelineEvents.slice(0, 10).map((event) => (
-                    <div key={event.id} className="relative flex gap-3">
+                    <div key={event.id} className="relative flex gap-4 group/timeline">
                       {/* Icon circle */}
-                      <div className={`relative z-10 h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${getTimelineColor(event.color)}`}>
+                      <div className={cn(
+                        "relative z-10 h-7 w-7 rounded-full flex items-center justify-center shrink-0 border border-background shadow-sm transition-transform group-hover/timeline:scale-110",
+                        getTimelineColor(event.color)
+                      )}>
                         {getTimelineIcon(event.icon)}
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0 pb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{event.title}</span>
-                          {event.value && (
-                            <span className="text-xs font-medium text-emerald-500">
-                              {formatCurrency(event.value)}
-                            </span>
-                          )}
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4 mb-0.5">
+                          <span className="text-sm font-medium text-foreground">{event.title}</span>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            {format(new Date(event.date), "dd MMM, HH:mm", { locale: ptBR })}
+                          </span>
                         </div>
                         {event.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {event.description}
                           </p>
                         )}
-                        <span className="text-[10px] text-muted-foreground/70 mt-1 block">
-                          {format(new Date(event.date), "dd MMM, HH:mm", { locale: ptBR })}
-                        </span>
+                        {event.value && (
+                          <div className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-medium text-xs">
+                            {formatCurrency(event.value)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -548,14 +571,19 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
           {/* Instance info */}
           {instancePhone && (
             <>
-              <Separator />
-              <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Conexão
-                </h4>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span>{instancePhone.replace(/^55/, "+55 ")}</span>
+              <Separator className="bg-white/5" />
+              <div className="space-y-3 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                    Conectado via
+                  </span>
+                  <div className="flex-1 h-px bg-white/5" />
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5 text-sm text-foreground/80">
+                  <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                    <Phone className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="font-medium tracking-tight">{instancePhone.replace(/^55/, "+55 ")}</span>
                 </div>
               </div>
             </>

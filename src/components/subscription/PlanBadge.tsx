@@ -3,42 +3,67 @@ import { Crown, Clock, Zap, Gem, ChevronRight, AlertTriangle } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 
 const planConfig = {
   trial_expired: {
     icon: AlertTriangle,
-    label: "Trial Expirado",
-    className: "bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400",
+    label: "Expirado",
+    wrapperClass: "border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-transparent",
     iconClass: "text-orange-500",
+    badgeClass: "bg-orange-500",
+    glowClass: "from-orange-500/20",
+    progressClass: "[&>div]:bg-orange-500 bg-orange-500/20"
   },
   trial: {
     icon: Clock,
     label: "Teste Grátis",
-    className: "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400",
-    iconClass: "text-amber-500",
+    wrapperClass: "border-primary/20 bg-gradient-to-br from-primary/5 to-transparent",
+    iconClass: "text-primary dark:text-primary",
+    badgeClass: "bg-primary",
+    glowClass: "from-primary/20",
+    progressClass: "[&>div]:bg-primary bg-primary/20"
   },
   start: {
     icon: Zap,
     label: "Start",
-    className: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
+    wrapperClass: "border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-transparent",
     iconClass: "text-emerald-500",
+    badgeClass: "bg-emerald-500",
+    glowClass: "from-emerald-500/20",
+    progressClass: "[&>div]:bg-emerald-500 bg-emerald-500/20"
   },
   pro: {
     icon: Crown,
     label: "Pro",
-    className: "bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400",
+    wrapperClass: "border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent",
     iconClass: "text-blue-500",
+    badgeClass: "bg-blue-500",
+    glowClass: "from-blue-500/20",
+    progressClass: "[&>div]:bg-blue-500 bg-blue-500/20"
   },
   business: {
     icon: Gem,
     label: "Business",
-    className: "bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400",
+    wrapperClass: "border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent",
     iconClass: "text-purple-500",
+    badgeClass: "bg-purple-500",
+    glowClass: "from-purple-500/20",
+    progressClass: "[&>div]:bg-purple-500 bg-purple-500/20"
   },
 };
 
 export const PlanBadge = () => {
-  const { subscription, isLoading, connectionsUsed, totalConnections, trialDaysLeft, isTrialExpired } = useSubscription();
+  const {
+    subscription,
+    isLoading,
+    connectionsUsed,
+    totalConnections,
+    trialDaysLeft,
+    isTrialExpired,
+    membersUsed,
+    membersLimit
+  } = useSubscription();
 
   if (isLoading) {
     return (
@@ -54,34 +79,95 @@ export const PlanBadge = () => {
   const Icon = config.icon;
   const showTrialExpired = effectiveType === 'trial_expired';
 
+  // Calculate connection usage percentage
+  const usagePercentage = Math.min(100, Math.max(0, (connectionsUsed / Math.max(1, totalConnections)) * 100));
+  const membersPercentage = Math.min(100, Math.max(0, (membersUsed / Math.max(1, membersLimit)) * 100));
+
   return (
-    <Link to="/plans" className="block mx-3 mb-3">
+    <Link to="/plans" className="block mx-3 mb-3 group outline-none">
       <div
         className={cn(
-          "p-3 rounded-lg border transition-all hover:scale-[1.02] cursor-pointer",
-          config.className,
-          planType === 'trial' && !isTrialExpired && "animate-pulse"
+          "relative overflow-hidden p-3 rounded-xl border transition-all duration-300",
+          "hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]",
+          config.wrapperClass
         )}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon className={cn("h-4 w-4", config.iconClass)} />
-            <span className="font-medium text-sm">
-              {config.label}
-              {planType === 'trial' && !isTrialExpired && trialDaysLeft > 0 && (
-                <span className="ml-1 text-xs opacity-80">
-                  ({trialDaysLeft}d restantes)
+        {/* Subtle background glow effect */}
+        <div className={cn(
+          "absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-gradient-to-br to-transparent transition-opacity group-hover:opacity-40",
+          config.glowClass
+        )} />
+
+        <div className="relative z-10 flex flex-col gap-2.5">
+          {/* Header row: Icon, Label, Chevron */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "flex items-center justify-center w-6 h-6 rounded-md bg-background/50 backdrop-blur-sm border border-white/5",
+                planType === 'trial' && !isTrialExpired && "animate-pulse"
+              )}>
+                <Icon className={cn("h-3.5 w-3.5", config.iconClass)} />
+              </div>
+              <div className="flex flex-col">
+                <span className={cn(
+                  "font-semibold text-xs tracking-tight",
+                  showTrialExpired ? "text-orange-500" : "text-foreground"
+                )}>
+                  {config.label}
                 </span>
-              )}
-            </span>
+                {planType === 'trial' && !isTrialExpired && trialDaysLeft > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-medium -mt-0.5">
+                    {trialDaysLeft} dias restantes
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
           </div>
-          <ChevronRight className="h-4 w-4 opacity-60" />
-        </div>
-        <div className="mt-1.5 text-xs opacity-80">
-          {showTrialExpired 
-            ? "Assine para continuar" 
-            : `${connectionsUsed}/${totalConnections} ${totalConnections === 1 ? 'Conexão' : 'Conexões'}`
-          }
+
+          {/* Progress / Status row */}
+          {!showTrialExpired && (
+            <div className="flex flex-col gap-2 mt-0.5">
+              {/* Connections Usage */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                  <span>Conexões ativas</span>
+                  <span className={cn(
+                    usagePercentage >= 100 ? "text-orange-500 font-bold" : "text-foreground/80"
+                  )}>
+                    {connectionsUsed}/{totalConnections}
+                  </span>
+                </div>
+                <Progress
+                  value={usagePercentage}
+                  className={cn("h-1.5", config.progressClass)}
+                />
+              </div>
+
+              {/* Members Usage */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                  <span>Membros</span>
+                  <span className={cn(
+                    membersPercentage >= 100 ? "text-orange-500 font-bold" : "text-foreground/80"
+                  )}>
+                    {membersUsed}/{membersLimit}
+                  </span>
+                </div>
+                <Progress
+                  value={membersPercentage}
+                  className={cn("h-1.5 bg-muted/50", config.progressClass.replace('bg-', 'bg-opacity-20 '))}
+                />
+              </div>
+            </div>
+          )}
+
+          {showTrialExpired && (
+            <div className="mt-0.5 text-[11px] font-medium text-orange-500/80 group-hover:text-orange-500 transition-colors">
+              Clique aqui para continuar usando
+            </div>
+          )}
         </div>
       </div>
     </Link>

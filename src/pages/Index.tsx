@@ -1254,12 +1254,8 @@ const Index = () => {
 
           {/* Integrated Hero Section (Stripe/Fintech Style) */}
           <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-black text-neutral-900 dark:text-white mb-8 border border-border/50 dark:border-white/10 shadow-sm md:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
-            {/* Subtle Dynamic Background Gradients */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-              <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px]" />
-              <div className="absolute bottom-[0%] right-[0%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[100px]" />
-              <div className="absolute top-[20%] right-[20%] w-[30%] h-[30%] rounded-full bg-purple-500/10 blur-[80px]" />
-            </div>
+            {/* Removed Dynamic Background Gradients */}
+            {/* ... */}
 
             <div className="relative p-6 sm:p-8 lg:p-10 z-10 flex flex-col h-full justify-between gap-12">
               {/* Header Content */}
@@ -1575,10 +1571,10 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Desktop Charts Row */}
-          <div className="grid gap-6 md:grid-cols-2 mb-8">
-            {/* Messages Activity Chart */}
-            <Card className="border-border shadow-sm overflow-hidden relative group">
+          {/* Desktop Charts Row: 60/40 split */}
+          <div className="grid gap-6 md:grid-cols-5 mb-8">
+            {/* Messages Activity Chart (60%) */}
+            <Card className="border-border shadow-sm overflow-hidden relative group md:col-span-3">
               <div className="absolute -top-[20%] -right-[10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[100px] -z-10 pointer-events-none group-hover:bg-blue-500/10 transition-colors duration-700" />
               <div className="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/5 rounded-full blur-[100px] -z-10 pointer-events-none group-hover:bg-emerald-500/10 transition-colors duration-700" />
 
@@ -1681,8 +1677,8 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            {/* Leads by Status Pie Chart */}
-            <Card className="border-border shadow-sm overflow-hidden relative group">
+            {/* Leads by Status Pie Chart (40%) */}
+            <Card className="border-border shadow-sm overflow-hidden relative group md:col-span-2">
               <div className="absolute top-[10%] left-[10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none group-hover:bg-primary/10 transition-colors duration-700" />
               <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[80px] -z-10 pointer-events-none group-hover:bg-purple-500/10 transition-colors duration-700" />
 

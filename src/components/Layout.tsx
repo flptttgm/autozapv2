@@ -147,7 +147,7 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
-        <TrialBanner />
+        <TrialBanner key={activeWorkspace?.id} />
         <div className="flex-1 flex overflow-hidden relative">
           {/* Mobile Overlay */}
           {sidebarOpen && (
@@ -174,7 +174,8 @@ const Layout = ({ children }: LayoutProps) => {
               "h-screen lg:h-full",
               // Desktop: collapsible width
               sidebarCollapsed ? "lg:w-20" : "lg:w-64",
-              "w-64"
+              "w-64",
+              "sidebar-pattern-bg"
             )}
             style={{
               // Only apply top offset on fixed screens (less than lg: 1024px)
@@ -186,238 +187,246 @@ const Layout = ({ children }: LayoutProps) => {
                   : '100%' // Desktop relative
             }}
           >
-            <div className={cn(
-              "flex flex-col h-full transition-transform duration-300",
-              !sidebarCollapsed && "scale-[0.95] origin-top"
-            )}>
-              <div className={cn("p-4", sidebarCollapsed ? "lg:px-3 lg:py-5" : "p-6")}>
-                {sidebarCollapsed ? (
+            <div className="flex flex-col h-full min-h-max relative z-10">
+              <div className={cn(
+                "flex flex-col flex-1 transition-transform duration-300 origin-top",
+                !sidebarCollapsed && "scale-[0.95]"
+              )}>
+                <div className={cn("p-4", sidebarCollapsed ? "lg:px-3 lg:py-5" : "p-6")}>
+                  {sidebarCollapsed ? (
+                    <div
+                      className="hidden lg:flex justify-center items-center h-12 cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => setSidebarCollapsed(false)}
+                    >
+                      <span className="font-funnel font-bold text-[33px] text-primary">{"{a}"}</span>
+                    </div>
+                  ) : null}
                   <div
-                    className="hidden lg:flex justify-center items-center h-12 cursor-pointer hover:scale-105 transition-transform"
-                    onClick={() => setSidebarCollapsed(false)}
-                  >
-                    <span className="font-funnel font-bold text-[33px] text-primary">{"{a}"}</span>
-                  </div>
-                ) : null}
-                <div
-                  className={cn(
-                    "flex items-center justify-between cursor-pointer group rounded-lg transition-colors p-1 -m-1 hover:bg-muted/50",
-                    sidebarCollapsed && "lg:hidden"
-                  )}
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                      setSidebarOpen(false);
-                    } else {
-                      setSidebarCollapsed(true);
-                    }
-                  }}
-                >
-                  <Logo size="md" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden lg:inline-flex h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity items-center justify-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                    className={cn(
+                      "flex items-center justify-between cursor-pointer group rounded-lg transition-colors p-1 -m-1 hover:bg-muted/50",
+                      sidebarCollapsed && "lg:hidden"
+                    )}
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                        setSidebarOpen(false);
+                      } else {
                         setSidebarCollapsed(true);
                       }
                     }}
                   >
-                    <PanelLeftClose className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Workspace Switcher — hidden when collapsed (shown in header instead) */}
-              {!sidebarCollapsed && (
-                <div className="pb-2">
-                  <div className="px-4 pb-1">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Workspace Atual
-                    </span>
-                  </div>
-                  <WorkspaceSwitcher collapsed={false} />
-                </div>
-              )}
-
-              <nav className={cn(
-                "space-y-1 flex-1",
-                sidebarCollapsed ? "lg:px-3" : "px-3",
-                "px-3"
-              )}>
-                {/* Primary Navigation: Dashboard + Workspaces (only on principal workspace) */}
-                {!activeWorkspace?.template && primaryNav.map(renderNavItem)}
-
-                {/* Template-specific items */}
-                {templateItems.length > 0 && (
-                  <>
-                    {!sidebarCollapsed && (
-                      <div className="pt-4 pb-1 px-1">
-                        <span className={cn(
-                          "text-[10px] font-semibold uppercase tracking-wider",
-                          activeTemplate.color
-                        )}>
-                          {activeTemplate.name}
-                        </span>
-                      </div>
-                    )}
-                    {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
-                    {templateItems.map(renderNavItem)}
-                  </>
-                )}
-
-                {/* Separator */}
-                {templateItems.length > 0 && !sidebarCollapsed && (
-                  <div className="pt-3 pb-1 px-1">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Geral
-                    </span>
-                  </div>
-                )}
-                {templateItems.length > 0 && sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
-
-                {/* Agentes - logo após Dashboard */}
-                {renderNavItem(agentsNav)}
-
-                {/* Leads with dropdown - force expanded on mobile overlay */}
-                <LeadsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
-
-                {/* Conversations with dropdown - force expanded on mobile overlay */}
-                <ConversationsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
-
-                {/* Appointments with dropdown - force expanded on mobile overlay */}
-                {isAppointmentsVisible && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
-
-                {/* Orçamentos */}
-                {isQuotesVisible && renderNavItem({ name: "Orçamentos", href: "/quotes", icon: FileText })}
-
-                {/* Cobranças */}
-                {isInvoicesVisible && renderNavItem({ name: "Cobranças", href: "/invoices", icon: Receipt })}
-
-                {/* Tools Navigation: Conexões WhatsApp */}
-                {toolsNav.map(renderNavItem)}
-              </nav>
-
-              {/* Bottom section - using mt-auto to push to bottom */}
-              <div className={cn("mt-auto", isMobile ? "pb-4" : "pb-6")}>
-
-                {/* Separator: SUPORTE E AJUSTES */}
-                <div className={cn("pb-2", sidebarCollapsed && "lg:hidden", "px-3")}>
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Suporte e Ajustes
-                  </span>
-                </div>
-                {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-3 mb-2" />}
-
-                {/* Suporte, Indicações, Configurações */}
-                <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3 space-y-1 mb-4")}>
-                  {/* Support Button */}
-                  {sidebarCollapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => {
-                            setSidebarOpen(false);
-                            setSupportChatOpen(!supportChatOpen);
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
-                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                            "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                          )}
-                        >
-                          <MessageSquareText className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">Suporte</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSidebarOpen(false);
-                        setSupportChatOpen(!supportChatOpen);
+                    <Logo size="md" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hidden lg:inline-flex h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity items-center justify-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                          setSidebarCollapsed(true);
+                        }
                       }}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
-                        "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                      )}
                     >
-                      <MessageSquareText className="h-5 w-5 shrink-0" />
-                      <span>Suporte</span>
-                    </button>
-                  )}
-
-                  {/* Indicações Link */}
-                  {sidebarCollapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Link
-                          to="/indicacao"
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
-                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                            location.pathname === "/indicacao"
-                              ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                              : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                          )}
-                        >
-                          <Share2 className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">Indicações</span>
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <Link
-                      to="/indicacao"
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                        location.pathname === "/indicacao"
-                          ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                          : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                      )}
-                    >
-                      <Share2 className="h-5 w-5 shrink-0" />
-                      <span>Indicações</span>
-                    </Link>
-                  )}
-
-                  {/* Configurações */}
-                  {systemNav.map(renderNavItem)}
+                      <PanelLeftClose className="h-5 w-5" />
+                    </Button>
+                  </div>
                 </div>
 
-                {/* PlanBadge */}
-                <div className={cn(sidebarCollapsed && "lg:hidden")}>
-                  <PlanBadge />
-                </div>
+                {/* Workspace Switcher — hidden when collapsed (shown in header instead) */}
+                {!sidebarCollapsed && (
+                  <div className="pb-2">
+                    <div className="px-4 pb-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Workspace Atual
+                      </span>
+                    </div>
+                    <WorkspaceSwitcher collapsed={false} />
+                  </div>
+                )}
 
-                {/* Botão Sair */}
-                <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3")}>
-                  {sidebarCollapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="hidden lg:flex w-14 h-14 mx-auto group"
-                          onClick={handleLogout}
-                        >
-                          <LogOut className="h-6 w-6 transition-transform duration-200 group-hover:scale-110" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Sair</TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start gap-3", sidebarCollapsed && "lg:hidden")}
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-5 w-5" />
-                    Sair
-                  </Button>
+                <nav className={cn(
+                  "space-y-1 flex-1",
+                  sidebarCollapsed ? "lg:px-3" : "px-3",
+                  "px-3"
+                )}>
+                  {/* Primary Navigation: Dashboard + Workspaces (only on principal workspace) */}
+                  {!activeWorkspace?.template && primaryNav.map(renderNavItem)}
+
+                  {/* Template-specific items */}
+                  {templateItems.length > 0 && (
+                    <>
+                      {!sidebarCollapsed && (
+                        <div className="pt-4 pb-1 px-1">
+                          <span className={cn(
+                            "text-[10px] font-semibold uppercase tracking-wider",
+                            activeTemplate.color
+                          )}>
+                            {activeTemplate.name}
+                          </span>
+                        </div>
+                      )}
+                      {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+                      {templateItems.map(renderNavItem)}
+                    </>
+                  )}
+
+                  {/* Separator */}
+                  {templateItems.length > 0 && !sidebarCollapsed && (
+                    <div className="pt-3 pb-1 px-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Geral
+                      </span>
+                    </div>
+                  )}
+                  {templateItems.length > 0 && sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+
+                  {/* Agentes - logo após Dashboard */}
+                  {renderNavItem(agentsNav)}
+
+                  {/* Leads with dropdown - force expanded on mobile overlay */}
+                  <LeadsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+
+                  {/* Conversations with dropdown - force expanded on mobile overlay */}
+                  <ConversationsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+
+                  {/* Appointments with dropdown - force expanded on mobile overlay */}
+                  {isAppointmentsVisible && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
+
+                  {/* Orçamentos */}
+                  {isQuotesVisible && renderNavItem({ name: "Orçamentos", href: "/quotes", icon: FileText })}
+
+                  {/* Cobranças */}
+                  {isInvoicesVisible && renderNavItem({ name: "Cobranças", href: "/invoices", icon: Receipt })}
+
+                  {/* Tools Navigation: Conexões WhatsApp */}
+                  {toolsNav.map(renderNavItem)}
+                </nav>
+
+                {/* Bottom section of top group - using mt-auto */}
+                <div className={cn("mt-auto", isMobile ? "pb-4" : "pb-4")}>
+
+                  {/* Separator: SUPORTE E AJUSTES */}
+                  <div className={cn("pb-2", sidebarCollapsed && "lg:hidden", "px-3")}>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Suporte e Ajustes
+                    </span>
+                  </div>
+                  {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-3 mb-2" />}
+
+                  {/* Suporte, Indicações, Configurações */}
+                  <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3 space-y-1 mb-4")}>
+                    {/* Support Button */}
+                    {sidebarCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => {
+                              setSidebarOpen(false);
+                              setSupportChatOpen(!supportChatOpen);
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
+                              "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                              "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                            )}
+                          >
+                            <MessageSquareText className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                            <span className="lg:hidden">Suporte</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSidebarOpen(false);
+                          setSupportChatOpen(!supportChatOpen);
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                          "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                        )}
+                      >
+                        <MessageSquareText className="h-5 w-5 shrink-0" />
+                        <span>Suporte</span>
+                      </button>
+                    )}
+
+                    {/* Indicações Link */}
+                    {sidebarCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link
+                            to="/indicacao"
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
+                              "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                              location.pathname === "/indicacao"
+                                ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                            )}
+                          >
+                            <Share2 className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                            <span className="lg:hidden">Indicações</span>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Link
+                        to="/indicacao"
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                          location.pathname === "/indicacao"
+                            ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                            : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                        )}
+                      >
+                        <Share2 className="h-5 w-5 shrink-0" />
+                        <span>Indicações</span>
+                      </Link>
+                    )}
+
+                    {/* Configurações */}
+                    {systemNav.map(renderNavItem)}
+                  </div>
+                </div> {/* End of TOP Scaled Group */}
+
+                {/* BOTTOM SCALED GROUP: Container inferior (PlanBadge + Botão Sair) */}
+                <div className={cn(
+                  "flex flex-col gap-2 pb-4 transition-transform duration-300 origin-bottom shrink-0",
+                  !sidebarCollapsed && "scale-[0.95]"
+                )}>
+                  {/* PlanBadge */}
+                  <div className={cn(sidebarCollapsed && "lg:hidden")}>
+                    <PlanBadge key={activeWorkspace?.id} />
+                  </div>
+
+                  {/* Botão Sair */}
+                  <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3")}>
+                    {sidebarCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="hidden lg:flex w-14 h-14 mx-auto group"
+                            onClick={handleLogout}
+                          >
+                            <LogOut className="h-6 w-6 transition-transform duration-200 group-hover:scale-110" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Sair</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      className={cn("w-full justify-start gap-3", sidebarCollapsed && "lg:hidden")}
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-5 w-5" />
+                      Sair
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -483,7 +492,7 @@ const Layout = ({ children }: LayoutProps) => {
           <WhatsAppConnectionModal />
 
           {/* AI Promotion Banner */}
-          <AIPromotionBanner onOpenAIChat={() => setAiChatOpen(true)} />
+          <AIPromotionBanner key={activeWorkspace?.id} onOpenAIChat={() => setAiChatOpen(true)} />
         </div>
       </div>
     </TooltipProvider>

@@ -3,6 +3,7 @@ import { Send, Paperclip, Image, Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { EmojiPickerPopover } from "./EmojiPickerPopover";
 import { ShortcutsPopover, QuickReply } from "./ShortcutsPopover";
 import { AudioRecorder } from "./AudioRecorder";
@@ -81,10 +82,10 @@ export const MessageInput = memo(function MessageInput({
   const handleDocumentSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     // Reset input so same file can be selected again
     e.target.value = "";
-    
+
     setSelectedDocumentFile(file);
     setDocumentDialogOpen(true);
   }, []);
@@ -120,10 +121,10 @@ export const MessageInput = memo(function MessageInput({
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     // Reset input so same file can be selected again
     e.target.value = "";
-    
+
     setSelectedImageFile(file);
     setImageDialogOpen(true);
   }, []);
@@ -222,7 +223,7 @@ export const MessageInput = memo(function MessageInput({
         isPending={isDocumentPending}
       />
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-background/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] transition-all focus-within:ring-1 focus-within:ring-primary/30">
         {/* Text area */}
         <Textarea
           placeholder="Digite sua mensagem aqui..."
@@ -230,12 +231,12 @@ export const MessageInput = memo(function MessageInput({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isDisabled}
-          className="border-0 resize-none min-h-[60px] max-h-[120px] focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent px-4 py-3"
+          className="border-0 resize-none min-h-[60px] max-h-[120px] focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent px-4 py-3 placeholder:text-muted-foreground/60"
           rows={2}
         />
 
         {/* Action toolbar */}
-        <div className="flex items-center justify-between px-2 py-2 border-t border-border/50 bg-muted/30">
+        <div className="flex items-center justify-between px-2 py-2 border-t border-white/5 bg-black/5 dark:bg-white/5">
           <div className="flex items-center gap-0.5">
             {/* Emoji picker */}
             <EmojiPickerPopover
@@ -247,37 +248,37 @@ export const MessageInput = memo(function MessageInput({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-full transition-colors"
               disabled={isDisabled}
               onClick={handleAttachmentClick}
             >
-              <Paperclip className="h-5 w-5" />
+              <Paperclip className="h-4 w-4" />
             </Button>
 
             {/* Image button */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-full transition-colors"
               disabled={isDisabled}
               onClick={handleImageClick}
             >
-              <Image className="h-5 w-5" />
+              <Image className="h-4 w-4" />
             </Button>
 
             {/* Audio button */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-full transition-colors"
               disabled={isDisabled}
               onClick={handleAudioClick}
             >
-              <Mic className="h-5 w-5" />
+              <Mic className="h-4 w-4" />
             </Button>
 
             {/* Divider */}
-            <div className="w-px h-5 bg-border mx-1" />
+            <div className="w-px h-4 bg-white/10 mx-1" />
 
             {/* Shortcuts popover */}
             <ShortcutsPopover
@@ -292,12 +293,17 @@ export const MessageInput = memo(function MessageInput({
             onClick={handleSend}
             disabled={!text.trim() || isDisabled}
             size="icon"
-            className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all hover:scale-105"
+            className={cn(
+              "h-9 w-9 rounded-full shadow-lg transition-all",
+              !text.trim() || isDisabled
+                ? "bg-muted text-muted-foreground"
+                : "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_15px_rgba(var(--primary),0.3)]"
+            )}
           >
             {isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4 ml-0.5" />
             )}
           </Button>
         </div>

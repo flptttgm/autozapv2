@@ -43,70 +43,89 @@ export const useSubscription = () => {
   const profile = authContext.profile;
   const isProfileLoading = authContext.loading;
 
-  const { data: subscription, isLoading: isQueryLoading, refetch } = useQuery({
+  const { data: billingInfo, isLoading: isQueryLoading, refetch } = useQuery({
     queryKey: ['subscription', profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return null;
 
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('workspace_id', profile.workspace_id)
-        .maybeSingle();
+      // 1. Get current workspace to find its owner
+      const { data: currentWs, error: currentError } = await supabase
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', profile.workspace_id)
+        .single();
 
-      if (error) {
-        console.error('Error fetching subscription:', error);
+      if (currentError || !currentWs) {
+        console.error('Error fetching current workspace for billing:', currentError);
         return null;
       }
 
-      return data as Subscription | null;
+      // 2. Get the owner's main workspace (oldest one)
+      const { data: mainWs, error: mainError } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', currentWs.owner_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      const billingWorkspaceId = mainWs?.id || profile.workspace_id;
+
+      // 3. Get the subscription for the main workspace
+      const { data: subscriptionData, error: subError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('workspace_id', billingWorkspaceId)
+        .maybeSingle();
+
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+        return null;
+      }
+
+      // 4. Get total connections used across ALL workspaces owned by this user
+      // First find all workspaces owned by this user
+      const { data: allWorkspaces } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', currentWs.owner_id);
+
+      const allWorkspaceIds = allWorkspaces?.map(w => w.id) || [billingWorkspaceId];
+
+      // Count total instances
+      const { count: connectionsUsed } = await supabase
+        .from('whatsapp_instances')
+        .select('*', { count: 'exact', head: true })
+        .in('workspace_id', allWorkspaceIds);
+
+      // Count total members (excluding duplicates if same user is in multiple workspaces)
+      // Actually simply count members in the active workspace or main workspace?
+      // Usually seats are counted on the main workspace
+      const { count: membersUsed } = await supabase
+        .from('workspace_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', billingWorkspaceId);
+
+      return {
+        subscription: subscriptionData as Subscription | null,
+        billingWorkspaceId,
+        ownerId: currentWs.owner_id,
+        allWorkspaceIds,
+        connectionsUsed: connectionsUsed || 0,
+        membersUsed: membersUsed || 0,
+      };
     },
     enabled: !!profile?.workspace_id,
   });
+
+  const subscription = billingInfo?.subscription || null;
 
   // True loading state: ONLY when actually loading, not when there's no user
   // If profile loading is done but no workspace_id, that's not a loading state - it's "no data"
   const isLoading = isProfileLoading || (!!profile?.workspace_id && isQueryLoading);
 
-  const { data: connectionsUsed = 0 } = useQuery({
-    queryKey: ['connections-used', profile?.workspace_id],
-    queryFn: async () => {
-      if (!profile?.workspace_id) return 0;
-
-      const { count, error } = await supabase
-        .from('whatsapp_instances')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', profile.workspace_id);
-
-      if (error) {
-        console.error('Error fetching connections:', error);
-        return 0;
-      }
-
-      return count || 0;
-    },
-    enabled: !!profile?.workspace_id,
-  });
-
-  const { data: membersUsed = 0 } = useQuery({
-    queryKey: ['members-used', profile?.workspace_id],
-    queryFn: async () => {
-      if (!profile?.workspace_id) return 0;
-
-      const { count, error } = await supabase
-        .from('workspace_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', profile.workspace_id);
-
-      if (error) {
-        console.error('Error fetching members:', error);
-        return 0;
-      }
-
-      return count || 0;
-    },
-    enabled: !!profile?.workspace_id,
-  });
+  const connectionsUsed = billingInfo?.connectionsUsed || 0;
+  const membersUsed = billingInfo?.membersUsed || 0;
 
   const membersLimit = subscription?.members_limit || 1;
 
