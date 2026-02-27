@@ -171,12 +171,12 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
         {funnelData && funnelData.some((d) => d.value > 0) ? (
           <div className="flex flex-col flex-1 gap-2">
             {funnelData.map((step, index) => {
-              const previousValue = index > 0 ? funnelData[index - 1].value : 0;
+              const baseValue = funnelData[0].value;
               const percentage = index === 0
                 ? "BASE 100%"
-                : index === funnelData.length - 1
-                  ? `${calculateDrop(step.value, previousValue)}%`
-                  : `- ${calculateDrop(step.value, previousValue)}%`;
+                : baseValue > 0
+                  ? `${Math.round((step.value / baseValue) * 100)}%`
+                  : "0%";
 
               // Symmetrical shrinking effect
               const shrinkFactor = index * 4; // 0, 4, 8, 12, 16 percentage points

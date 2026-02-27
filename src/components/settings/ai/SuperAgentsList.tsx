@@ -44,7 +44,7 @@ interface SuperAgentsListProps {
 
 export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
     const queryClient = useQueryClient();
-    const [showWizard, setShowWizard] = useState(false);
+    const [view, setView] = useState<"list" | "create" | "edit">("list");
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [editAgent, setEditAgent] = useState<any>(null);
 
@@ -78,21 +78,18 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
 
     const deleteMutation = useMutation({
         mutationFn: async (agentId: string) => {
-            // Reset instances that use this agent
             await supabase
                 .from("whatsapp_instances")
-                .update({ agent_engine: "legacy", super_agent_id: null })
+                .update({ agent_engine: null, super_agent_id: null })
                 .eq("super_agent_id", agentId);
-
             const { error } = await supabase
                 .from("super_agents")
                 .delete()
                 .eq("id", agentId);
-
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success("Super Agent removido");
+            toast.success("Agente removido");
             queryClient.invalidateQueries({ queryKey: ["super-agents"] });
             queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
             setDeleteId(null);
@@ -110,6 +107,25 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
         );
     }
 
+    // ─── WIZARD VIEW (create or edit) ───
+    if (view === "create" || view === "edit") {
+        return (
+            <SuperAgentWizard
+                workspaceId={workspaceId}
+                editAgent={view === "edit" ? editAgent : undefined}
+                onCancel={() => {
+                    setView("list");
+                    setEditAgent(null);
+                }}
+                onComplete={() => {
+                    setView("list");
+                    setEditAgent(null);
+                }}
+            />
+        );
+    }
+
+    // ─── LIST VIEW ───
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -117,28 +133,35 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
                 <div>
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                         <Rocket className="h-5 w-5 text-primary" />
-                        Super Agents
+                        Agentes
                     </h3>
                     <p className="text-sm text-muted-foreground">
                         Agentes proativos com ferramentas, RAG e memória avançada
                     </p>
                 </div>
-                <Button onClick={() => setShowWizard(true)} className="gap-2">
+                <Button onClick={() => setView("create")} className="gap-2">
                     <Plus className="h-4 w-4" />
-                    Criar Super Agent
+                    Criar Agente
                 </Button>
             </div>
 
             {/* Agent Cards */}
             {agents.length === 0 ? (
-                <Card className="p-8 text-center border-dashed">
-                    <Rocket className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                    <p className="text-muted-foreground font-medium">Nenhum Super Agent criado</p>
-                    <p className="text-sm text-muted-foreground mt-1">Crie seu primeiro agente proativo com ferramentas e prompt personalizado</p>
-                    <Button className="mt-4 gap-2" onClick={() => setShowWizard(true)}>
-                        <Plus className="h-4 w-4" />
-                        Criar Super Agent
-                    </Button>
+                <Card className="p-10 text-center border-dashed">
+                    <div className="max-w-md mx-auto">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+                            <Rocket className="h-8 w-8 text-primary/50" />
+                        </div>
+                        <h4 className="font-semibold text-lg mb-1">Nenhum agente criado</h4>
+                        <p className="text-sm text-muted-foreground mb-5">
+                            Crie seu primeiro agente de IA com prompt personalizado, ferramentas e personalidade única.
+                            Ele vai atender seus clientes 24/7!
+                        </p>
+                        <Button className="gap-2" onClick={() => setView("create")}>
+                            <Plus className="h-4 w-4" />
+                            Criar meu primeiro Agente
+                        </Button>
+                    </div>
                 </Card>
             ) : (
                 <div className="grid gap-3">
@@ -148,7 +171,7 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
                         const tools = agent.enabled_tools || [];
 
                         return (
-                            <Card key={agent.id} className="p-4 hover:border-primary/30 transition-all">
+                            <Card key={agent.id} className="p-4 hover:border-primary/30 transition-all group">
                                 <div className="flex items-start gap-4">
                                     {/* Icon */}
                                     <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
@@ -181,14 +204,12 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
                                                     {toolLabels[t] || t}
                                                 </Badge>
                                             ))}
-
                                             {linkedInstances.length > 0 && (
                                                 <Badge variant="secondary" className="text-[10px] gap-1 ml-1">
                                                     <Zap className="h-2.5 w-2.5" />
                                                     {linkedInstances.length} instância{linkedInstances.length > 1 ? 's' : ''}
                                                 </Badge>
                                             )}
-
                                             {linkedInstances.length === 0 && (
                                                 <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
                                                     Não aplicado
@@ -198,14 +219,14 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
                                     </div>
 
                                     {/* Actions */}
-                                    <div className="flex items-center gap-1 shrink-0">
+                                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 text-muted-foreground hover:text-primary"
                                             onClick={() => {
                                                 setEditAgent(agent);
-                                                setShowWizard(true);
+                                                setView("edit");
                                             }}
                                         >
                                             <Pencil className="h-4 w-4" />
@@ -226,24 +247,13 @@ export const SuperAgentsList = ({ workspaceId }: SuperAgentsListProps) => {
                 </div>
             )}
 
-            {/* Wizard (create or edit) */}
-            <SuperAgentWizard
-                open={showWizard}
-                onOpenChange={(open) => {
-                    setShowWizard(open);
-                    if (!open) setEditAgent(null);
-                }}
-                workspaceId={workspaceId}
-                editAgent={editAgent}
-            />
-
             {/* Delete confirmation */}
             <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Remover Super Agent?</AlertDialogTitle>
+                        <AlertDialogTitle>Remover Agente?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            As instâncias vinculadas voltarão ao modo legacy. Esta ação não pode ser desfeita.
+                            As instâncias vinculadas ficarão sem agente. Esta ação não pode ser desfeita.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

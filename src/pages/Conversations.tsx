@@ -571,25 +571,102 @@ const MemoizedChatContent = memo(function ChatContent({
         className={`flex-1 h-full items-center justify-center whatsapp-doodle-bg ${isDesktop ? "flex" : "hidden"}`}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="flex flex-col items-center gap-4 p-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="flex flex-col items-center gap-6 p-8"
         >
-          {/* Animated Icon with Pulse Ring */}
-          <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <MessageSquare className="h-10 w-10 text-primary" />
+          {/* Animated Icon with Pulse Rings */}
+          <div className="relative">
+            {/* Outer pulse ring */}
+            <motion.div
+              className="absolute inset-0 rounded-full bg-primary/10"
+              animate={{
+                scale: [1, 1.8, 1.8],
+                opacity: [0.4, 0, 0],
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: "easeOut",
+              }}
+              style={{ width: 80, height: 80 }}
+            />
+            {/* Inner pulse ring */}
+            <motion.div
+              className="absolute inset-0 rounded-full bg-primary/15"
+              animate={{
+                scale: [1, 1.5, 1.5],
+                opacity: [0.5, 0, 0],
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: "easeOut",
+                delay: 0.4,
+              }}
+              style={{ width: 80, height: 80 }}
+            />
+            {/* Main icon container with float + horizontal spin */}
+            <motion.div
+              className="relative h-20 w-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center backdrop-blur-sm"
+              style={{ perspective: 600 }}
+              animate={{
+                y: [0, -6, 0],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <motion.div
+                animate={{ rotateY: [0, 360] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  repeatDelay: 4,
+                  ease: "easeInOut",
+                }}
+                style={{ transformStyle: "preserve-3d" }}
+              >
+                <MessageSquare className="h-9 w-9 text-primary" />
+              </motion.div>
+            </motion.div>
           </div>
 
-          {/* Text Content */}
+          {/* Text Content with stagger */}
           <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">
+            <motion.h3
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-lg font-semibold text-foreground"
+            >
               Selecione uma conversa
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-xs">
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="text-sm text-muted-foreground max-w-xs"
+            >
               Escolha uma conversa na lista ao lado para começar a interagir
-            </p>
+            </motion.p>
           </div>
+
+          {/* Subtle bottom badge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50 mt-2"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[11px] text-muted-foreground font-medium">
+              Pronto para atender
+            </span>
+          </motion.div>
         </motion.div>
       </div>
     );
@@ -1449,7 +1526,7 @@ const Conversations = () => {
       const { data, error } = await supabase
         .from("whatsapp_instances")
         .select(
-          "id, instance_id, phone, status, is_paused, ai_mode, ai_template_id",
+          "id, instance_id, phone, status, is_paused, ai_mode, ai_template_id, super_agent_id",
         )
         .eq("workspace_id", profile.workspace_id);
 
@@ -1459,30 +1536,29 @@ const Conversations = () => {
     enabled: !!profile?.workspace_id,
   });
 
-  // Get the template ID for the selected instance
-  const activeTemplateId = useMemo(() => {
+  // Get the super agent ID for the selected instance
+  const activeSuperAgentId = useMemo(() => {
     if (!selectedInstance || !whatsappInstances) return null;
     const instance = whatsappInstances.find(
       (i) => i.instance_id === selectedInstance,
     );
-    return instance?.ai_template_id || null;
+    return instance?.super_agent_id || null;
   }, [selectedInstance, whatsappInstances]);
 
-  // Fetch quick replies from the active template
+  // Fetch quick replies from the active super agent
   const { data: quickReplies = [] } = useQuery({
-    queryKey: ["template-quick-replies", activeTemplateId],
+    queryKey: ["agent-quick-replies", activeSuperAgentId],
     queryFn: async () => {
-      if (!activeTemplateId) return [];
+      if (!activeSuperAgentId) return [];
       const { data, error } = await supabase
-        .from("custom_templates")
-        .select("config")
-        .eq("id", activeTemplateId)
+        .from("super_agents")
+        .select("quick_replies")
+        .eq("id", activeSuperAgentId)
         .single();
 
       if (error) throw error;
-      const config = data?.config as Record<string, unknown> | null;
       return (
-        (config?.quick_replies as Array<{
+        (data?.quick_replies as Array<{
           id?: string;
           trigger: string;
           response: string;
@@ -1490,7 +1566,7 @@ const Conversations = () => {
         }>) || []
       );
     },
-    enabled: !!activeTemplateId,
+    enabled: !!activeSuperAgentId,
   });
 
   // Create a map of instanceId to phone for quick lookup
@@ -1733,28 +1809,36 @@ const Conversations = () => {
         >,
       );
 
-      // Group by chat_id using Map for O(1) lookups instead of O(n) find()
+      // Group by lead_id (preferred) or chat_id (fallback for messages without lead)
+      // This prevents duplicate conversations when the same lead has messages with different chat_id formats
       const chatMap = new Map<string, any>();
 
       data.forEach((msg: any) => {
         const chatId = msg.chat_id;
+        const leadId = msg.lead_id;
         const meta = msg.metadata as any;
+        // Use lead_id as the primary grouping key when available, fallback to chat_id
+        const groupKey = leadId || chatId;
 
-        if (chatMap.has(chatId)) {
+        if (chatMap.has(groupKey)) {
           // Only update missing instanceId/groupName
-          const existing = chatMap.get(chatId);
+          const existing = chatMap.get(groupKey);
           if (!existing.instanceId && meta?.instanceId) {
             existing.instanceId = meta.instanceId;
           }
           if (!existing.groupName && meta?.groupName) {
             existing.groupName = meta.groupName;
           }
+          // Track all chat_ids for this lead (for unread count aggregation)
+          if (chatId && !existing._allChatIds.has(chatId)) {
+            existing._allChatIds.add(chatId);
+          }
         } else {
           // First message for this chat (already the most recent due to ORDER BY)
           const isGroup = chatId?.includes("-group") || meta?.isGroup === true;
-          chatMap.set(chatId, {
+          chatMap.set(groupKey, {
             chat_id: chatId,
-            lead_id: msg.lead_id,
+            lead_id: leadId,
             created_at: msg.created_at,
             leads: msg.leads,
             instanceId: meta?.instanceId || null,
@@ -1766,6 +1850,7 @@ const Conversations = () => {
               messageType: msg.message_type,
               isAI: meta?.respondedByAI === true,
             },
+            _allChatIds: new Set([chatId]),
           });
         }
       });
@@ -1774,10 +1859,26 @@ const Conversations = () => {
 
       // Enrich with unread count and AI paused/pinned/favorite status from maps (no additional queries!)
       return uniqueChats.map((chat: any) => {
-        const memory = memoryByChat[chat.chat_id];
+        // Aggregate unread count across all chat_ids for this lead
+        let totalUnread = 0;
+        for (const cid of chat._allChatIds) {
+          totalUnread += unreadByChat[cid] || 0;
+        }
+        // Check memory by any of the chat_ids (primary first)
+        let memory = memoryByChat[chat.chat_id];
+        if (!memory) {
+          for (const cid of chat._allChatIds) {
+            if (memoryByChat[cid]) {
+              memory = memoryByChat[cid];
+              break;
+            }
+          }
+        }
+        // Remove internal tracking set before returning
+        const { _allChatIds, ...cleanChat } = chat;
         return {
-          ...chat,
-          unread_count: unreadByChat[chat.chat_id] || 0,
+          ...cleanChat,
+          unread_count: totalUnread,
           ai_paused: memory?.ai_paused ?? false,
           is_pinned: memory?.is_pinned ?? false,
           is_favorite: memory?.is_favorite ?? false,

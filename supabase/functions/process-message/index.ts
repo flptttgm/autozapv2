@@ -79,13 +79,12 @@ serve(async (req: Request) => {
     if (audio_transcription) processedContent = `[Transcrição de Áudio]: "${audio_transcription}"`;
 
     // ════════════════════════════════════════════════
-    // 4. ROUTE: Engine Fork
+    // 4. ROUTE: Super Agent (default) or Legacy fallback
     // ════════════════════════════════════════════════
-    const engine = instance.agent_engine || 'legacy';
     const superAgent = instance.super_agents;
 
-    if (engine === 'super_agent' && superAgent && PYTHON_AGENT_URL) {
-      // ─── SUPER AGENT → Python Agent Service ───
+    if (superAgent && PYTHON_AGENT_URL) {
+      // ─── SUPER AGENT → Python Agent Service (default path) ───
       console.log('[process-message] 🚀 Routing to Super Agent (Python)');
 
       try {
@@ -149,8 +148,8 @@ serve(async (req: Request) => {
       }
 
     } else {
-      // ─── PURE LEGACY: Original TypeScript processing ───
-      console.log('[process-message] 📝 Using legacy TypeScript processing');
+      // ─── FALLBACK: No super agent configured → Legacy TypeScript ───
+      console.log('[process-message] 📝 No super agent configured, using TypeScript fallback');
       return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent);
     }
 
@@ -161,7 +160,7 @@ serve(async (req: Request) => {
 });
 
 /**
- * Legacy TypeScript processing (original logic preserved as fallback)
+ * Legacy TypeScript processing (fallback when no super agent or Python service unavailable)
  */
 async function legacyProcess(
   supabase: SupabaseClient,

@@ -151,7 +151,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
         )} />
         <span className="flex-1 text-left min-w-[60px]">{terminology.plural}</span>
         {totalNewLeads > 0 && (
-          <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600">
+          <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
             {totalNewLeads > 99 ? "99+" : totalNewLeads}
           </Badge>
         )}
@@ -178,7 +178,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
           )} />
           <span className="flex-1 text-left min-w-[60px]">{terminology.plural}</span>
           {totalNewLeads > 0 && (
-            <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600">
+            <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
               {totalNewLeads > 99 ? "99+" : totalNewLeads}
             </Badge>
           )}
@@ -242,7 +242,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
                 {instance.display_name || formatPhone(instance.phone)}
               </span>
               {instanceData.new > 0 && (
-                <Badge className="h-4 px-1 text-[10px] bg-blue-500 hover:bg-blue-600">
+                <Badge className="h-4 px-1 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
                   {instanceData.new}
                 </Badge>
               )}

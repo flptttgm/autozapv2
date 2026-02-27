@@ -80,7 +80,20 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({ ignored: true }), { headers: corsHeaders });
       }
 
-      // 0a. Message Deduplication (Z-API sends duplicate webhooks ~10s apart)
+      // 0a. Normalize phone number — ensure country code 55 prefix
+      // Z-API may send phone with or without country code; leads may be stored either way
+      if (phone && !phone.includes('@')) {
+        const digitsOnly = phone.replace(/\D/g, '');
+        // Brazilian numbers: if it doesn't start with 55, add it
+        if (!digitsOnly.startsWith('55')) {
+          phone = '55' + digitsOnly;
+          console.log(`[zapi-webhook] 📞 Normalized phone: ${payload.phone} → ${phone}`);
+        } else {
+          phone = digitsOnly;
+        }
+      }
+
+      // 0b. Message Deduplication (Z-API sends duplicate webhooks ~10s apart)
       if (messageId) {
         const { data: existingMsg } = await supabase
           .from('messages')
@@ -94,7 +107,7 @@ serve(async (req: Request) => {
         }
       }
 
-      // 0b. Cross-Instance Anti-Echo Protection
+      // 0c. Cross-Instance Anti-Echo Protection
       // Check if this exact message was sent by US (outbound) in the last 10 seconds
       const { data: recentOutbound, error: echoError } = await supabase
         .from('messages')
@@ -152,13 +165,37 @@ serve(async (req: Request) => {
       // 2. Find or Create Lead
       console.log('[zapi-webhook] Processing lead for phone:', phone);
 
-      // Check if lead already exists BEFORE upsert (to detect new leads)
-      const { data: existingLead } = await supabase
+      // Try to find lead with normalized phone first, then try without country code
+      let existingLead = null;
+      const { data: leadByFullPhone } = await supabase
         .from('leads')
-        .select('id')
+        .select('id, name, avatar_url')
         .eq('workspace_id', workspaceId)
         .eq('phone', phone)
         .maybeSingle();
+
+      existingLead = leadByFullPhone;
+
+      // If not found, try without country code (e.g., lead was saved as "17997451788" instead of "5517997451788")
+      if (!existingLead && phone.startsWith('55') && phone.length > 2) {
+        const phoneWithoutCountry = phone.substring(2);
+        const { data: leadByShortPhone } = await supabase
+          .from('leads')
+          .select('id, name, avatar_url')
+          .eq('workspace_id', workspaceId)
+          .eq('phone', phoneWithoutCountry)
+          .maybeSingle();
+
+        if (leadByShortPhone) {
+          console.log(`[zapi-webhook] 📞 Found lead with short phone ${phoneWithoutCountry}, updating to ${phone}`);
+          // Update the lead's phone to include country code for consistency
+          await supabase
+            .from('leads')
+            .update({ phone: phone })
+            .eq('id', leadByShortPhone.id);
+          existingLead = leadByShortPhone;
+        }
+      }
 
       const isNewLead = !existingLead;
 
@@ -166,19 +203,31 @@ serve(async (req: Request) => {
         ? (payload.chatName || 'Grupo')
         : (payload.senderName || payload.chatName || payload.pushName || 'Novo Cliente');
 
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .upsert({
-          workspace_id: workspaceId,
-          phone: phone,
-          name: leadName,
-        }, { onConflict: 'workspace_id, phone' })
-        .select('id, name, avatar_url')
-        .single();
+      let lead;
+      let leadError;
 
-      if (leadError) {
+      if (existingLead) {
+        // Lead already exists — don't overwrite the name (user may have set a custom name)
+        lead = existingLead;
+        leadError = null;
+      } else {
+        // Create new lead
+        const { data: newLead, error: newLeadError } = await supabase
+          .from('leads')
+          .insert({
+            workspace_id: workspaceId,
+            phone: phone,
+            name: leadName,
+          })
+          .select('id, name, avatar_url')
+          .single();
+        lead = newLead;
+        leadError = newLeadError;
+      }
+
+      if (leadError || !lead) {
         await supabaseDebug.from('debug_logs').insert({ data: { error: 'lead_upsert_error', details: leadError } });
-        throw leadError;
+        throw leadError || new Error('Failed to find or create lead');
       }
 
       // New leads in selective mode start with AI disabled (won't auto-respond)

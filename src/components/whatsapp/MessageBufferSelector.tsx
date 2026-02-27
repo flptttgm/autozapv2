@@ -83,15 +83,15 @@ export function MessageBufferSelector({
                                     <br />
                                     <strong>10-30s:</strong> Recomendado para conversas rápidas.
                                     <br />
-                                    <strong>60-120s:</strong> Para quem envia muitas mensagens seguidas.
+                                    <strong>45-60s:</strong> Para quem envia muitas mensagens seguidas.
                                 </p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${value === 0
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-primary/15 text-primary"
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-primary/15 text-primary"
                     }`}>
                     {getLabel()}
                 </span>
@@ -102,7 +102,7 @@ export function MessageBufferSelector({
                 value={[value]}
                 onValueChange={(v) => setValue(v[0])}
                 onValueCommit={handleCommit}
-                max={120}
+                max={60}
                 min={0}
                 step={5}
                 disabled={updateBufferMutation.isPending}
@@ -111,10 +111,10 @@ export function MessageBufferSelector({
 
             <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
                 <span>0s</span>
+                <span>15s</span>
                 <span>30s</span>
+                <span>45s</span>
                 <span>60s</span>
-                <span>90s</span>
-                <span>120s</span>
             </div>
         </div>
     );

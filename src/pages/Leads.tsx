@@ -132,9 +132,15 @@ const Leads = () => {
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: z.infer<typeof leadSchema>) => {
+      // Normalize phone: ensure country code 55 prefix
+      let normalizedPhone = data.phone.replace(/\D/g, '');
+      if (!normalizedPhone.startsWith('55')) {
+        normalizedPhone = '55' + normalizedPhone;
+      }
+
       const { error } = await supabase.from("leads").insert({
         name: data.name,
-        phone: data.phone,
+        phone: normalizedPhone,
         email: data.email || null,
         status: data.status,
         workspace_id: profile?.workspace_id,

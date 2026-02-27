@@ -32,10 +32,10 @@ interface RoutingConfig {
   hybrid_threshold?: number;
 }
 
-interface CustomTemplate {
+interface AgentOption {
   id: string;
   name: string;
-  agent_persona_name: string | null;
+  persona_name: string | null;
   agent_type: string | null;
 }
 
@@ -51,7 +51,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
         .select('*')
         .eq('workspace_id', workspaceId)
         .maybeSingle();
-      
+
       if (error && error.code !== 'PGRST116') throw error;
       return data as RoutingConfig | null;
     },
@@ -60,16 +60,16 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
 
   // Fetch agents for default selection
   const { data: agents = [] } = useQuery({
-    queryKey: ['custom-templates-for-routing', workspaceId],
+    queryKey: ['agents-for-routing', workspaceId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('custom_templates')
-        .select('id, name, agent_persona_name, agent_type')
+        .from('super_agents')
+        .select('id, name, persona_name, agent_type')
         .eq('workspace_id', workspaceId)
         .order('name');
-      
+
       if (error) throw error;
-      return data as CustomTemplate[];
+      return data as AgentOption[];
     },
     enabled: !!workspaceId
   });
@@ -112,13 +112,12 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
         }, {
           onConflict: 'workspace_id'
         });
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-routing-config', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['custom-templates', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['custom-templates-for-routing', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['agents-for-routing', workspaceId] });
       toast.success('Configurações de roteamento salvas!');
     },
     onError: (error) => {
@@ -129,7 +128,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
 
   const handleConfigChange = (updates: Partial<RoutingConfig>) => {
     let newConfig = { ...config, ...updates };
-    
+
     // Auto-select support agent as default when enabling routing without a default
     if (updates.is_routing_enabled && !newConfig.default_agent_id && agents.length > 0) {
       const supportAgent = agents.find(a => a.agent_type === 'support');
@@ -142,7 +141,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
         console.log('[AgentRouting] Auto-selected first agent as default:', agents[0].name);
       }
     }
-    
+
     setConfig(newConfig);
     saveMutation.mutate(newConfig);
   };
@@ -193,11 +192,10 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                 {/* HYBRID - FIRST AND HIGHLIGHTED */}
                 <Label
                   htmlFor="mode-hybrid"
-                  className={`flex flex-col gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                    config.routing_mode === 'hybrid' 
-                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30' 
-                      : 'border-border hover:border-amber-500/50'
-                  }`}
+                  className={`flex flex-col gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${config.routing_mode === 'hybrid'
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30'
+                    : 'border-border hover:border-amber-500/50'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="hybrid" id="mode-hybrid" className="mt-0" />
@@ -207,7 +205,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                   <p className="text-xs text-muted-foreground">
                     {ROUTING_MODES.hybrid.description}
                   </p>
-                  
+
                   {/* Threshold Slider - only shows when hybrid selected */}
                   {config.routing_mode === 'hybrid' && (
                     <div className="space-y-2 pt-2 border-t">
@@ -219,8 +217,8 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                       </div>
                       <Slider
                         value={[(config.hybrid_threshold || 0.70) * 100]}
-                        onValueChange={(values) => handleConfigChange({ 
-                          hybrid_threshold: values[0] / 100 
+                        onValueChange={(values) => handleConfigChange({
+                          hybrid_threshold: values[0] / 100
                         })}
                         min={50}
                         max={95}
@@ -237,11 +235,10 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                 {/* KEYWORDS */}
                 <Label
                   htmlFor="mode-keywords"
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                    config.routing_mode === 'keywords' 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${config.routing_mode === 'keywords'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                    }`}
                 >
                   <RadioGroupItem value="keywords" id="mode-keywords" className="mt-1" />
                   <div className="space-y-1">
@@ -254,15 +251,14 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                     </p>
                   </div>
                 </Label>
-                
+
                 {/* AI */}
                 <Label
                   htmlFor="mode-ai"
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                    config.routing_mode === 'ai' 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${config.routing_mode === 'ai'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                    }`}
                 >
                   <RadioGroupItem value="ai" id="mode-ai" className="mt-1" />
                   <div className="space-y-1">
@@ -290,11 +286,10 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                   <Label
                     key={style.id}
                     htmlFor={`style-${style.id}`}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      config.transition_style === style.id 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${config.transition_style === style.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                      }`}
                   >
                     <RadioGroupItem value={style.id} id={`style-${style.id}`} />
                     <span className="text-xl">{style.icon}</span>
@@ -315,8 +310,8 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
               </p>
               <Select
                 value={config.default_agent_id || 'none'}
-                onValueChange={(value) => handleConfigChange({ 
-                  default_agent_id: value === 'none' ? null : value 
+                onValueChange={(value) => handleConfigChange({
+                  default_agent_id: value === 'none' ? null : value
                 })}
               >
                 <SelectTrigger>
@@ -333,9 +328,9 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
                             {agent.agent_type}
                           </Badge>
                         )}
-                        {agent.agent_persona_name && (
+                        {agent.persona_name && (
                           <span className="text-muted-foreground text-xs">
-                            ({agent.agent_persona_name})
+                            ({agent.persona_name})
                           </span>
                         )}
                       </div>
@@ -353,8 +348,8 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
               <div className="space-y-1">
                 <p className="text-sm font-medium">Como funciona</p>
                 <p className="text-xs text-muted-foreground">
-                  A cada mensagem do cliente, o sistema analisa o conteúdo e decide qual agente 
-                  é mais adequado. Se mudar de agente, uma mensagem de transição é enviada 
+                  A cada mensagem do cliente, o sistema analisa o conteúdo e decide qual agente
+                  é mais adequado. Se mudar de agente, uma mensagem de transição é enviada
                   apresentando o novo atendente. O histórico da conversa é mantido entre as trocas.
                 </p>
               </div>

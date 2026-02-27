@@ -106,25 +106,25 @@ const useEmbeddingPolling = (itemId: string | null, onComplete: () => void) => {
 
   const startPolling = () => {
     if (!itemId) return;
-    
+
     setStatus('polling');
     pollCountRef.current = 0;
-    
+
     intervalRef.current = setInterval(async () => {
       pollCountRef.current++;
-      
+
       try {
         const { data, error } = await supabase
           .from('knowledge_base')
           .select('embedding_status')
           .eq('id', itemId)
           .single();
-        
+
         if (error) {
           console.error('[KB Polling] Error:', error);
           return;
         }
-        
+
         if (data?.embedding_status === 'completed') {
           setStatus('completed');
           clearInterval(intervalRef.current!);
@@ -239,7 +239,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
     () => {
       setIsWaitingEmbedding(false);
       queryClient.invalidateQueries({ queryKey: ["knowledge_base"] });
-      
+
       if (pollingStatus === 'completed') {
         toast.success("✓ Item indexado para IA!");
       } else if (pollingStatus === 'failed') {
@@ -247,24 +247,24 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       } else {
         toast.info("Item salvo. A indexação está em andamento (aguarde até 30s).");
       }
-      
+
       setIsDialogOpen(false);
       setSavedItemId(null);
     }
   );
 
-  // Fetch agents (custom_templates)
+  // Fetch agents (super_agents)
   const { data: agents } = useQuery({
     queryKey: ["agents_for_kb", workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
       const { data, error } = await supabase
-        .from("custom_templates")
+        .from("super_agents")
         .select("id, name, icon")
         .eq("workspace_id", workspaceId)
         .order("name");
       if (error) throw error;
-      return data as Agent[];
+      return (data || []) as Agent[];
     },
     enabled: !!workspaceId,
   });
@@ -331,19 +331,19 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       setSavedItemId(itemId);
       setIsWaitingEmbedding(true);
       toast.info("Indexando para IA...", { duration: 2000 });
-      
+
       logChange({
         action: editingItem ? 'update' : 'create',
         entity_type: 'knowledge_base',
         entity_id: editingItem?.id,
-        changes_summary: editingItem 
-          ? `Atualizado: ${formData.title}` 
+        changes_summary: editingItem
+          ? `Atualizado: ${formData.title}`
           : `Criado: ${formData.title} (${formData.category})`,
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ["knowledge_base"] });
       resetForm();
-      
+
       // Iniciar polling
       setTimeout(() => startPolling(), 500);
     },
@@ -398,7 +398,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
         .from("knowledge_base")
         .update({ embedding_status: 'pending' })
         .eq("id", itemId);
-      
+
       // Chamar edge function
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embedding`, {
         method: 'POST',
@@ -411,11 +411,11 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
           knowledge_item_id: itemId
         })
       });
-      
+
       if (!response.ok) {
         throw new Error('Falha ao reprocessar');
       }
-      
+
       return itemId;
     },
     onSuccess: () => {
@@ -467,7 +467,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
   const handleAgentToggle = (agentId: string, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
-      agent_ids: checked 
+      agent_ids: checked
         ? [...prev.agent_ids, agentId]
         : prev.agent_ids.filter(id => id !== agentId),
     }));
@@ -531,7 +531,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-semibold">Base de Conhecimento</h3>
         <p className="text-sm text-muted-foreground">
-          Configure as informações que a IA deve conhecer sobre seu negócio. 
+          Configure as informações que a IA deve conhecer sobre seu negócio.
           Essas informações serão usadas para responder clientes com dados reais.
         </p>
       </div>
@@ -540,7 +540,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Por padrão, itens de conhecimento são <strong>compartilhados entre todos os agentes</strong>. 
+          Por padrão, itens de conhecimento são <strong>compartilhados entre todos os agentes</strong>.
           Você pode restringir a agentes específicos ao criar ou editar um item.
         </AlertDescription>
       </Alert>
@@ -582,176 +582,176 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
                 Adicionar Item
               </Button>
             </DialogTrigger>
-          <DialogContent className="w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-200 ease-out">
-            <DialogHeader>
-              <DialogTitle>
-                {editingItem ? "Editar Item" : "Novo Item"}
-              </DialogTitle>
-            </DialogHeader>
+            <DialogContent className="w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-200 ease-out">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingItem ? "Editar Item" : "Novo Item"}
+                </DialogTitle>
+              </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Categoria</Label>
-                <Select value={formData.category} onValueChange={handleCategoryChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4" />
-                            {cat.label}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Título</Label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ex: Pacote E-commerce Completo"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Conteúdo</Label>
-                <Textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
-                  placeholder="Descreva todas as informações que a IA deve saber..."
-                  rows={8}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Seja detalhado! Inclua valores, condições, prazos, etc.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Palavras-chave (opcional)</Label>
-                <Input
-                  value={formData.keywords}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, keywords: e.target.value }))}
-                  placeholder="ecommerce, loja virtual, site (separadas por vírgula)"
-                />
-              </div>
-
-              {/* Agent Selection */}
-              <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                <Label className="text-base font-medium">Disponível para</Label>
-                
-                <div className="flex items-center gap-3">
-                  <div 
-                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
-                    onClick={() => setFormData(prev => ({ ...prev, is_global: true, agent_ids: [] }))}
-                  >
-                    <Globe className="h-4 w-4" />
-                    <span className="text-sm font-medium">Todos os agentes</span>
-                  </div>
-                  
-                  <div 
-                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${!formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
-                    onClick={() => setFormData(prev => ({ ...prev, is_global: false }))}
-                  >
-                    <Bot className="h-4 w-4" />
-                    <span className="text-sm font-medium">Agentes específicos</span>
-                  </div>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Select value={formData.category} onValueChange={handleCategoryChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => {
+                        const Icon = cat.icon;
+                        return (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4" />
+                              {cat.label}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {!formData.is_global && (
-                  <div className="space-y-2 pt-2">
-                    {agents && agents.length > 0 ? (
-                      <div className="grid gap-2">
-                        {agents.map((agent) => (
-                          <div key={agent.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`agent-${agent.id}`}
-                              checked={formData.agent_ids.includes(agent.id)}
-                              onCheckedChange={(checked) => handleAgentToggle(agent.id, !!checked)}
-                            />
-                            <label 
-                              htmlFor={`agent-${agent.id}`}
-                              className="text-sm cursor-pointer flex items-center gap-2"
-                            >
-                              <Bot className="h-3 w-3 text-muted-foreground" />
-                              {agent.name}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Nenhum agente criado. Crie agentes na aba "Agentes" primeiro.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Prioridade</Label>
+                  <Label>Título</Label>
                   <Input
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
-                    min={0}
-                    max={100}
+                    value={formData.title}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="Ex: Pacote E-commerce Completo"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Conteúdo</Label>
+                  <Textarea
+                    value={formData.content}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
+                    placeholder="Descreva todas as informações que a IA deve saber..."
+                    rows={8}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Maior = aparece primeiro
+                    Seja detalhado! Inclua valores, condições, prazos, etc.
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Status</Label>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Switch
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+                  <Label>Palavras-chave (opcional)</Label>
+                  <Input
+                    value={formData.keywords}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, keywords: e.target.value }))}
+                    placeholder="ecommerce, loja virtual, site (separadas por vírgula)"
+                  />
+                </div>
+
+                {/* Agent Selection */}
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <Label className="text-base font-medium">Disponível para</Label>
+
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
+                      onClick={() => setFormData(prev => ({ ...prev, is_global: true, agent_ids: [] }))}
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span className="text-sm font-medium">Todos os agentes</span>
+                    </div>
+
+                    <div
+                      className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${!formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
+                      onClick={() => setFormData(prev => ({ ...prev, is_global: false }))}
+                    >
+                      <Bot className="h-4 w-4" />
+                      <span className="text-sm font-medium">Agentes específicos</span>
+                    </div>
+                  </div>
+
+                  {!formData.is_global && (
+                    <div className="space-y-2 pt-2">
+                      {agents && agents.length > 0 ? (
+                        <div className="grid gap-2">
+                          {agents.map((agent) => (
+                            <div key={agent.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`agent-${agent.id}`}
+                                checked={formData.agent_ids.includes(agent.id)}
+                                onCheckedChange={(checked) => handleAgentToggle(agent.id, !!checked)}
+                              />
+                              <label
+                                htmlFor={`agent-${agent.id}`}
+                                className="text-sm cursor-pointer flex items-center gap-2"
+                              >
+                                <Bot className="h-3 w-3 text-muted-foreground" />
+                                {agent.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum agente criado. Crie agentes na aba "Agentes" primeiro.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Prioridade</Label>
+                    <Input
+                      type="number"
+                      value={formData.priority}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
+                      min={0}
+                      max={100}
                     />
-                    <span className="text-sm">
-                      {formData.is_active ? "Ativo" : "Inativo"}
-                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      Maior = aparece primeiro
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <div className="flex items-center gap-2 pt-2">
+                      <Switch
+                        checked={formData.is_active}
+                        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+                      />
+                      <span className="text-sm">
+                        {formData.is_active ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleDialogClose(false)}
-                  disabled={isWaitingEmbedding}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={saveMutation.isPending || isWaitingEmbedding}
-                >
-                  {isWaitingEmbedding ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Indexando...
-                    </>
-                  ) : saveMutation.isPending ? (
-                    "Salvando..."
-                  ) : (
-                    "Salvar"
-                  )}
-                </Button>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDialogClose(false)}
+                    disabled={isWaitingEmbedding}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={saveMutation.isPending || isWaitingEmbedding}
+                  >
+                    {isWaitingEmbedding ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Indexando...
+                      </>
+                    ) : saveMutation.isPending ? (
+                      "Salvando..."
+                    ) : (
+                      "Salvar"
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-        </div>
+            </DialogContent>
+          </Dialog>
+        </div >
 
         {workspaceId && (
           <FileUploadDialog
@@ -761,151 +761,155 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
             onSuccess={() => queryClient.invalidateQueries({ queryKey: ["knowledge_base"] })}
           />
         )}
-      </div>
+      </div >
 
       {/* Items List */}
-      {filteredItems?.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground mb-4">
-            Nenhum item na base de conhecimento.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Adicione informações sobre sua empresa, serviços e preços para que a IA responda com dados reais.
-          </p>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {filteredItems?.map((item) => {
-            const categoryInfo = getCategoryInfo(item.category);
-            const Icon = categoryInfo.icon;
-            const isGlobal = item.is_global ?? true;
-            const agentNames = getAgentNames(item.agent_ids || []);
+      {
+        filteredItems?.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              Nenhum item na base de conhecimento.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Adicione informações sobre sua empresa, serviços e preços para que a IA responda com dados reais.
+            </p>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {filteredItems?.map((item) => {
+              const categoryInfo = getCategoryInfo(item.category);
+              const Icon = categoryInfo.icon;
+              const isGlobal = item.is_global ?? true;
+              const agentNames = getAgentNames(item.agent_ids || []);
 
-            return (
-              <Card key={item.id} className={`p-4 ${!item.is_active ? "opacity-60" : ""}`}>
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
-                  <div className="flex items-start gap-3 flex-1 min-w-0 overflow-hidden">
-                    <div className={`p-2 rounded-lg ${categoryInfo.color} text-white shrink-0`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <h4 className="font-medium truncate w-full text-sm sm:text-base mb-1">{item.title}</h4>
-                      <div className="flex gap-1 flex-wrap mb-1">
-                        <Badge variant="secondary" className="shrink-0 text-xs">
-                          {categoryInfo.label}
-                        </Badge>
-                        {isGlobal ? (
-                          <Badge variant="outline" className="shrink-0 text-xs gap-1">
-                            <Globe className="h-3 w-3" />
-                            Global
-                          </Badge>
-                        ) : agentNames.length > 0 && (
-                          <Badge variant="outline" className="shrink-0 text-xs gap-1">
-                            <Bot className="h-3 w-3" />
-                            {agentNames.length <= 2 
-                              ? agentNames.join(", ") 
-                              : `${agentNames.slice(0, 2).join(", ")} +${agentNames.length - 2}`}
-                          </Badge>
-                        )}
-                        {!item.is_active && (
-                          <Badge variant="outline" className="shrink-0 text-xs">Inativo</Badge>
-                        )}
-                        {/* Badge de status de embedding */}
-                        <EmbeddingStatusBadge status={item.embedding_status} />
+              return (
+                <Card key={item.id} className={`p-4 ${!item.is_active ? "opacity-60" : ""}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0 overflow-hidden">
+                      <div className={`p-2 rounded-lg ${categoryInfo.color} text-white shrink-0`}>
+                        <Icon className="h-4 w-4" />
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 whitespace-pre-wrap break-words">
-                        {item.content}
-                      </p>
-                      {item.keywords?.length > 0 && (
-                        <div className="flex gap-1 mt-2 flex-wrap">
-                          {item.keywords.map((keyword, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
-                              {keyword}
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <h4 className="font-medium truncate w-full text-sm sm:text-base mb-1">{item.title}</h4>
+                        <div className="flex gap-1 flex-wrap mb-1">
+                          <Badge variant="secondary" className="shrink-0 text-xs">
+                            {categoryInfo.label}
+                          </Badge>
+                          {isGlobal ? (
+                            <Badge variant="outline" className="shrink-0 text-xs gap-1">
+                              <Globe className="h-3 w-3" />
+                              Global
                             </Badge>
-                          ))}
+                          ) : agentNames.length > 0 && (
+                            <Badge variant="outline" className="shrink-0 text-xs gap-1">
+                              <Bot className="h-3 w-3" />
+                              {agentNames.length <= 2
+                                ? agentNames.join(", ")
+                                : `${agentNames.slice(0, 2).join(", ")} +${agentNames.length - 2}`}
+                            </Badge>
+                          )}
+                          {!item.is_active && (
+                            <Badge variant="outline" className="shrink-0 text-xs">Inativo</Badge>
+                          )}
+                          {/* Badge de status de embedding */}
+                          <EmbeddingStatusBadge status={item.embedding_status} />
                         </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2 whitespace-pre-wrap break-words">
+                          {item.content}
+                        </p>
+                        {item.keywords?.length > 0 && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {item.keywords.map((keyword, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Botão de reprocessar se falhou */}
+                      {item.embedding_status === 'failed' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => reprocessEmbeddingMutation.mutate(item.id)}
+                          disabled={reprocessEmbeddingMutation.isPending}
+                          title="Reprocessar embedding"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${reprocessEmbeddingMutation.isPending ? 'animate-spin' : ''}`} />
+                        </Button>
                       )}
+                      <Switch
+                        checked={item.is_active}
+                        onCheckedChange={(checked) =>
+                          toggleActiveMutation.mutate({ id: item.id, is_active: checked })
+                        }
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir item?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. O item "{item.title}" será permanentemente excluído.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate({ id: item.id, title: item.title })}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Botão de reprocessar se falhou */}
-                    {item.embedding_status === 'failed' && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => reprocessEmbeddingMutation.mutate(item.id)}
-                        disabled={reprocessEmbeddingMutation.isPending}
-                        title="Reprocessar embedding"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${reprocessEmbeddingMutation.isPending ? 'animate-spin' : ''}`} />
-                      </Button>
-                    )}
-                    <Switch
-                      checked={item.is_active}
-                      onCheckedChange={(checked) =>
-                        toggleActiveMutation.mutate({ id: item.id, is_active: checked })
-                      }
-                    />
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir item?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. O item "{item.title}" será permanentemente excluído.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteMutation.mutate({ id: item.id, title: item.title })}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                </Card>
+              );
+            })}
+          </div>
+        )
+      }
 
       {/* Stats */}
-      {items && items.length > 0 && (
-        <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
-          <span>{items.length} itens no total</span>
-          <span>•</span>
-          <span>{items.filter((i) => i.is_active).length} ativos</span>
-          <span>•</span>
-          <span>{items.filter((i) => i.is_global ?? true).length} globais</span>
-          <span>•</span>
-          <span className="text-green-600">{statusCounts['completed'] || 0} indexados</span>
-          {(statusCounts['pending'] || 0) > 0 && (
-            <>
-              <span>•</span>
-              <span className="text-yellow-600">{statusCounts['pending']} aguardando</span>
-            </>
-          )}
-          {(statusCounts['failed'] || 0) > 0 && (
-            <>
-              <span>•</span>
-              <span className="text-red-600">{statusCounts['failed']} com erro</span>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+      {
+        items && items.length > 0 && (
+          <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
+            <span>{items.length} itens no total</span>
+            <span>•</span>
+            <span>{items.filter((i) => i.is_active).length} ativos</span>
+            <span>•</span>
+            <span>{items.filter((i) => i.is_global ?? true).length} globais</span>
+            <span>•</span>
+            <span className="text-green-600">{statusCounts['completed'] || 0} indexados</span>
+            {(statusCounts['pending'] || 0) > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-yellow-600">{statusCounts['pending']} aguardando</span>
+              </>
+            )}
+            {(statusCounts['failed'] || 0) > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-red-600">{statusCounts['failed']} com erro</span>
+              </>
+            )}
+          </div>
+        )
+      }
+    </div >
   );
 };

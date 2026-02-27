@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { MyTemplates } from "./ai/MyTemplates";
 import { SuperAgentsList } from "./ai/SuperAgentsList";
 import { KnowledgeBaseEditor } from "./ai/KnowledgeBaseEditor";
 import { AgentRoutingSettings } from "./ai/AgentRoutingSettings";
@@ -47,18 +46,8 @@ export const AISettingsPage = () => {
           <TabsTrigger value="automations" className="text-xs sm:text-sm">Automações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="agents" className="mt-6 space-y-8">
+        <TabsContent value="agents" className="mt-6">
           <SuperAgentsList workspaceId={workspaceId} />
-
-          <div className="border-t pt-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-              Agentes Legacy
-            </h3>
-            <MyTemplates
-              workspaceId={workspaceId}
-              onApplyTemplate={() => { }}
-            />
-          </div>
         </TabsContent>
 
         <TabsContent value="routing" className="mt-6">
@@ -90,3 +79,4 @@ export const AISettingsPage = () => {
     </div>
   );
 };
+

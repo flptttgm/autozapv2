@@ -46,7 +46,7 @@ const WhatsApp = () => {
     try {
       const { data, error } = await supabase
         .from('whatsapp_instances')
-        .select('id, instance_id, instance_token, workspace_id, status, phone, connected_at, created_at, subscribed, ai_mode')
+        .select('id, instance_id, instance_token, workspace_id, status, phone, connected_at, created_at, subscribed, ai_mode, message_buffer_seconds')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: true });
 

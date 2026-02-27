@@ -673,7 +673,7 @@ All colors MUST be HSL.
       hsl(var(--background) / 0.2),
       hsl(var(--background) / 0.2)),
     url('/images/whatsapp-doodle-dark.png');
-  background-size: cover, 440px 440px;
+  background-size: cover, 506px 506px;
   background-repeat: no-repeat, repeat;
   background-position: center, center;
 }
