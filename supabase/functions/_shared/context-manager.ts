@@ -35,9 +35,12 @@ export async function loadChatMemory(
 
 export async function updateChatMemory(
     supabase: SupabaseClient,
-    memoryId: string,
+    memoryId: string | null | undefined,
     newMessages: any[], // [UserMsg, AIMsg]
-    currentMemory: ChatMemory
+    currentMemory: ChatMemory,
+    workspaceId?: string,
+    leadId?: string,
+    chatId?: string,
 ) {
     let history = [...(currentMemory.conversation_history || []), ...newMessages];
     let summary = currentMemory.conversation_summary;
@@ -54,15 +57,30 @@ export async function updateChatMemory(
         summary = newSummary;
     }
 
-    // Update DB
-    await supabase
-        .from('chat_memory')
-        .update({
-            conversation_history: history,
-            conversation_summary: summary,
-            last_interaction: new Date().toISOString()
-        })
-        .eq('id', memoryId);
+    const updateData: Record<string, any> = {
+        conversation_history: history,
+        conversation_summary: summary,
+        last_interaction: new Date().toISOString()
+    };
+
+    if (memoryId) {
+        // UPDATE existing chat memory
+        await supabase
+            .from('chat_memory')
+            .update(updateData)
+            .eq('id', memoryId);
+    } else if (workspaceId && leadId) {
+        // INSERT new chat memory (first conversation)
+        updateData.workspace_id = workspaceId;
+        updateData.lead_id = leadId;
+        updateData.chat_id = chatId || leadId;
+        console.log(`[context-manager] 📝 Creating new chat_memory for lead ${leadId}`);
+        await supabase
+            .from('chat_memory')
+            .insert(updateData);
+    } else {
+        console.error('[context-manager] ⚠️ Cannot save memory: no memoryId and no workspaceId/leadId');
+    }
 }
 
 async function summarizeConversation(messages: any[], previousSummary: string | null): Promise<string> {

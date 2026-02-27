@@ -285,10 +285,10 @@ ${lead.name ? `\n[🟢 ESTILO]\nChame o interlocutor por ${lead.name}.` : ''}`;
 
   // Output & Memory Sync
   await Promise.all([
-    updateChatMemory(supabase, memory?.id || crypto.randomUUID(), [
+    updateChatMemory(supabase, memory?.id || null, [
       { role: 'user', content: processedContent },
       { role: 'assistant', content: finalResponse }
-    ], memory || { id: '', conversation_history: [], conversation_summary: null, context_flags: {} }),
+    ], memory || { id: '', conversation_history: [], conversation_summary: null, context_flags: {} }, workspaceId, lead_id, chat_id),
     supabase.functions.invoke('send-message', {
       body: { chat_id, message: finalResponse, lead_id }
     })
