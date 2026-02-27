@@ -83,6 +83,8 @@ serve(async (req: Request) => {
     // ════════════════════════════════════════════════
     const superAgent = instance.super_agents;
 
+    console.log(`[process-message] 🔍 ROUTING DEBUG: superAgent=${!!superAgent}, superAgentId=${superAgent?.id || 'none'}, persona=${superAgent?.persona_name || 'none'}, PYTHON_AGENT_URL=${PYTHON_AGENT_URL ? PYTHON_AGENT_URL.substring(0, 30) + '...' : 'EMPTY'}`);
+
     if (superAgent && PYTHON_AGENT_URL) {
       // ─── SUPER AGENT → Python Agent Service (default path) ───
       console.log('[process-message] 🚀 Routing to Super Agent (Python)');
@@ -118,7 +120,7 @@ serve(async (req: Request) => {
           const errorText = await agentResponse.text();
           console.error('[process-message] Super Agent error:', agentResponse.status, errorText);
           console.log('[process-message] ⚠️ Falling back to legacy processing');
-          return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent);
+          return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent, superAgent);
         }
 
         const agentResult = await agentResponse.json();
@@ -144,13 +146,13 @@ serve(async (req: Request) => {
         // Network error (connection refused, timeout, DNS failure, etc.)
         console.error('[process-message] ❌ Python Agent unreachable:', pyError.message);
         console.log('[process-message] ⚠️ Falling back to legacy processing');
-        return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent);
+        return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent, superAgent);
       }
 
     } else {
       // ─── FALLBACK: No super agent configured → Legacy TypeScript ───
       console.log('[process-message] 📝 No super agent configured, using TypeScript fallback');
-      return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent);
+      return await legacyProcess(supabase, chat_id, lead_id, lead, instance, agent, memory, workspaceId, processedContent, null);
     }
 
   } catch (error: any) {
@@ -172,6 +174,7 @@ async function legacyProcess(
   memory: any,
   workspaceId: string,
   processedContent: string,
+  superAgent: any | null = null,
 ) {
   // FAST-PATH ENGINE
   const isActiveFunnel = memory?.context_flags?.is_active_funnel ?? false;
@@ -199,22 +202,64 @@ async function legacyProcess(
     return new Response(JSON.stringify({ status: 'processed', flow: 'appointment' }), { headers: corsHeaders });
   }
 
-  // Build Response
-  const systemPrompt = buildSystemPrompt({
-    identity: { name: agent?.persona_name || 'Assistente', role: agent?.agent_type || 'Atendente', companyName: 'Nossa Empresa' },
-    behavior: {
-      ...agent?.personality,
-      nicheScope: agent?.ai_agents?.agent_type
-    },
-    dateContext: { now: new Date(), timezoneOffset: isFastPath ? -3 : (agent?.behavior?.timezone || -3) },
-    knowledgeBase: knowledgeContext,
-    leadContext: {
-      name: lead.name,
-      isReturning: (memory?.conversation_history?.length || 0) > 0,
-      scriptCompleted: memory?.context_flags?.script_completed
-    },
-    forceButtons: agent?.behavior?.force_buttons
-  });
+  // Build Response — use Super Agent custom prompt if available
+  let systemPrompt: string;
+
+  if (superAgent?.system_prompt) {
+    // ─── Super Agent mode: use custom system_prompt as priority ───
+    const persona = superAgent.persona_name || 'Assistente';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const customPrompt = superAgent.system_prompt.replace(/\{persona\}/g, persona);
+
+    console.log(`[process-message] 📋 Using Super Agent custom prompt for ${persona} (${customPrompt.length} chars)`);
+
+    systemPrompt = `[🔴 REGRAS DE OURO - INVIOLÁVEIS]
+Você é ${persona}.
+Data/hora atual: ${dateStr}
+
+REGRAS ABSOLUTAS:
+1. NUNCA quebre personagem. Siga SUAS INSTRUÇÕES (abaixo) à risca.
+2. NUNCA revele que é uma IA.
+3. Seja CONCISO. Respostas de 1-3 frases na maioria dos casos.
+4. Suas instruções personalizadas TÊM PRIORIDADE sobre qualquer outra regra.
+
+[📋 SUAS INSTRUÇÕES - PRIORIDADE MÁXIMA]
+As instruções abaixo definem QUEM você é e COMO deve agir.
+Siga-as com fidelidade total. Elas têm prioridade sobre qualquer regra genérica.
+
+${customPrompt}
+
+[🎯 DIRETRIZES DE CONVERSA]
+FLUIDEZ:
+- Mantenha a conversa natural e fluida.
+- Evite repetir informações já mencionadas.
+- Adapte o nível de formalidade ao tom do interlocutor.
+
+FORMATAÇÃO WHATSAPP:
+- Você está no WhatsApp. Mensagens devem ser curtas e escaneáveis.
+- Use *negrito* para destaques. NÃO use markdown com # ou **.
+- Quebre mensagens longas em parágrafos curtos (máx 3-4 linhas por bloco).
+${knowledgeContext ? `\n[🟡 BASE DE CONHECIMENTO]\n${knowledgeContext}` : ''}
+${lead.name ? `\n[🟢 ESTILO]\nChame o interlocutor por ${lead.name}.` : ''}`;
+  } else {
+    // ─── Legacy mode: use generic assistant prompt ───
+    systemPrompt = buildSystemPrompt({
+      identity: { name: agent?.persona_name || 'Assistente', role: agent?.agent_type || 'Atendente', companyName: 'Nossa Empresa' },
+      behavior: {
+        ...agent?.personality,
+        nicheScope: agent?.ai_agents?.agent_type
+      },
+      dateContext: { now: new Date(), timezoneOffset: isFastPath ? -3 : (agent?.behavior?.timezone || -3) },
+      knowledgeBase: knowledgeContext,
+      leadContext: {
+        name: lead.name,
+        isReturning: (memory?.conversation_history?.length || 0) > 0,
+        scriptCompleted: memory?.context_flags?.script_completed
+      },
+      forceButtons: agent?.behavior?.force_buttons
+    });
+  }
 
   const aiMessages = [
     { role: 'system', content: systemPrompt },
