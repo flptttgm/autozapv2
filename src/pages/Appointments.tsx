@@ -398,8 +398,8 @@ const Appointments = () => {
     <TooltipProvider delayDuration={200}>
       <div className="h-full flex flex-col p-4 sm:p-6 overflow-hidden relative">
         {/* Ambient background glows */}
-        <div className="absolute top-0 left-0 w-full h-[300px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 z-0" />
-        <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-purple-500/5 blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2 z-0" />
+        <div className="absolute top-0 left-0 w-full h-[300px] ambient-glow-primary blur-[120px] rounded-full pointer-events-none -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 right-0 w-[400px] h-[400px] ambient-glow-secondary blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2 z-0" />
 
         <div className="relative z-10 flex flex-col h-full min-h-0">
           {/* Header */}
@@ -596,9 +596,9 @@ const Appointments = () => {
                             "border hover:scale-105",
                             activeFilters.includes(status)
                               ? cn(
-                                  config.activeColor,
-                                  "border-transparent shadow-sm",
-                                )
+                                config.activeColor,
+                                "border-transparent shadow-sm",
+                              )
                               : "bg-background border-border text-muted-foreground hover:border-primary/50",
                           )}
                         >

@@ -314,10 +314,11 @@ const LeadDetails = () => {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       new: "NOVO LEAD",
-      prospect: "PROSPECÇÃO",
       contacted: "CONTATADO",
       qualified: "QUALIFICADO",
-      converted: "CONVERTIDO",
+      proposal: "PROPOSTA",
+      negotiation: "NEGOCIAÇÃO",
+      won: "FECHADO",
       lost: "PERDIDO",
     };
     return labels[status] || status?.toUpperCase();
@@ -326,10 +327,11 @@ const LeadDetails = () => {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       new: "bg-primary text-primary-foreground",
-      prospect: "bg-cyan-500 text-white",
       contacted: "bg-yellow-500 text-black",
       qualified: "bg-purple-500 text-white",
-      converted: "bg-green-500 text-white",
+      proposal: "bg-cyan-500 text-white",
+      negotiation: "bg-orange-500 text-white",
+      won: "bg-green-500 text-white",
       lost: "bg-red-500 text-white",
     };
     return colors[status] || "bg-gray-500 text-white";

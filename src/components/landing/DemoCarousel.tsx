@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, MessageSquare, BarChart3, LogIn, Users, MessagesSquare } from 'lucide-react';
-import { LandingAIDemo } from './LandingAIDemo';
+import { ChevronLeft, ChevronRight, BarChart3, LogIn, Users, MessagesSquare } from 'lucide-react';
 
 // Import screenshots
 import dashboardImg from '@/assets/carousel/dashboard.png';
@@ -13,9 +12,9 @@ interface SlideData {
     id: string;
     label: string;
     icon: React.ElementType;
-    type: 'component' | 'image';
-    image?: string;
-    alt?: string;
+    type: 'image';
+    image: string;
+    alt: string;
 }
 
 export const DemoCarousel = () => {
@@ -23,12 +22,6 @@ export const DemoCarousel = () => {
     const [autoplay, setAutoplay] = useState(true);
 
     const slides: SlideData[] = [
-        {
-            id: 'ai-demo',
-            label: 'Chat com IA',
-            icon: MessageSquare,
-            type: 'component',
-        },
         {
             id: 'login',
             label: 'Cadastro',
@@ -101,18 +94,14 @@ export const DemoCarousel = () => {
                         exit={{ opacity: 0, x: -50 }}
                         transition={{ duration: 0.3 }}
                     >
-                        {currentSlide.type === 'component' ? (
-                            <LandingAIDemo />
-                        ) : (
-                            <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-border/50 bg-zinc-900">
-                                <img
-                                    src={currentSlide.image}
-                                    alt={currentSlide.alt || ''}
-                                    className="w-full h-full object-contain"
-                                />
-                                <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background/10 to-transparent" />
-                            </div>
-                        )}
+                        <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-border/50 bg-zinc-900">
+                            <img
+                                src={currentSlide.image}
+                                alt={currentSlide.alt}
+                                className="w-full h-full object-contain"
+                            />
+                            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background/10 to-transparent" />
+                        </div>
                     </motion.div>
                 </AnimatePresence>
             </div>

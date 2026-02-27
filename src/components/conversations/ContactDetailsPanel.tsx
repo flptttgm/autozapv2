@@ -317,7 +317,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
   return (
     <div className="flex flex-col h-full bg-card/40 backdrop-blur-xl border-l border-white/5 relative overflow-hidden">
       {/* Header with close button */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-md relative z-10">
+      <div className="p-4 border-b border-white/5 flex items-center justify-between chat-header-bg backdrop-blur-md relative z-10">
         <div className="flex items-center gap-2">
           <div className="h-6 w-1 bg-primary rounded-full" />
           <span className="font-semibold text-sm tracking-tight text-foreground/90">Detalhes do Contato</span>

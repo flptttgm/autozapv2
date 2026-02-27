@@ -51,11 +51,6 @@ const STATUS_CONFIG = {
     bg: "bg-sky-500/20",
     text: "text-sky-300",
   },
-  prospect: {
-    label: "PROSPECÇÃO",
-    bg: "bg-cyan-500/20",
-    text: "text-cyan-300",
-  },
   contacted: {
     label: "CONTATADO",
     bg: "bg-amber-500/20",
@@ -66,8 +61,18 @@ const STATUS_CONFIG = {
     bg: "bg-violet-500/20",
     text: "text-violet-300",
   },
-  converted: {
-    label: "CONVERTIDO",
+  proposal: {
+    label: "PROPOSTA",
+    bg: "bg-cyan-500/20",
+    text: "text-cyan-300",
+  },
+  negotiation: {
+    label: "NEGOCIAÇÃO",
+    bg: "bg-orange-500/20",
+    text: "text-orange-300",
+  },
+  won: {
+    label: "FECHADO",
     bg: "bg-emerald-500/20",
     text: "text-emerald-300",
   },
@@ -189,23 +194,23 @@ const LeadTableRow = ({
 
   const createdAt = lead.created_at
     ? formatDistanceToNow(new Date(lead.created_at), {
-        addSuffix: true,
-        locale: ptBR,
-      })
+      addSuffix: true,
+      locale: ptBR,
+    })
     : "";
 
   const lastInteraction = lead.updated_at
     ? new Date(lead.updated_at).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+    : createdAt
+      ? new Date(lead.created_at!).toLocaleDateString("pt-BR", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       })
-    : createdAt
-      ? new Date(lead.created_at!).toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
       : "-";
 
   const handleCheckboxClick = (e: React.MouseEvent) => {

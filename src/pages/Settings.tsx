@@ -36,8 +36,8 @@ const Settings = () => {
   return (
     <div className="relative p-4 sm:p-6 lg:p-8 pb-32 md:pb-8 min-h-full overflow-hidden">
       {/* Ambient background glows */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3 z-0" />
-      <div className="absolute top-[40%] left-0 w-[400px] h-[400px] bg-purple-500/5 blur-[120px] rounded-full pointer-events-none -translate-x-1/3 z-0" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] ambient-glow-primary blur-[120px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3 z-0" />
+      <div className="absolute top-[40%] left-0 w-[400px] h-[400px] ambient-glow-secondary blur-[120px] rounded-full pointer-events-none -translate-x-1/3 z-0" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 sm:mb-6">

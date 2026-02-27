@@ -34,18 +34,21 @@ import {
     CalendarRange,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { MdCurrencyExchange, MdSupportAgent, MdDateRange, MdGroups2, MdHeadsetMic, MdCreditScore } from "react-icons/md";
+import { HiOutlineSpeakerphone } from "react-icons/hi";
+import type { IconType } from "react-icons";
 
 export interface TemplateSidebarItem {
     name: string;
     href: string;
-    icon: LucideIcon;
+    icon: LucideIcon | IconType;
 }
 
 export interface WorkspaceTemplateConfig {
     id: string;
     name: string;
     description: string;
-    icon: LucideIcon;
+    icon: LucideIcon | IconType;
     color: string;       // text-color class
     bgColor: string;     // bg-color class for icon container
     borderColor: string; // border-color class for outline
@@ -57,7 +60,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "marketing",
         name: "Marketing",
         description: "Campanhas, captação de leads e funil de marketing",
-        icon: Megaphone,
+        icon: HiOutlineSpeakerphone,
         color: "text-pink-500",
         bgColor: "bg-pink-500/10",
         borderColor: "border-pink-500/40",
@@ -72,7 +75,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "vendas",
         name: "Vendas",
         description: "Pipeline comercial, follow-ups e orçamentos",
-        icon: TrendingUp,
+        icon: MdCurrencyExchange,
         color: "text-emerald-500",
         bgColor: "bg-emerald-500/10",
         borderColor: "border-emerald-500/40",
@@ -87,7 +90,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "financeiro",
         name: "Financeiro",
         description: "Cobranças, pagamentos e controle financeiro",
-        icon: Wallet,
+        icon: MdCreditScore,
         color: "text-amber-500",
         bgColor: "bg-amber-500/10",
         borderColor: "border-amber-500/40",
@@ -102,7 +105,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "reunioes",
         name: "Reuniões",
         description: "Agendamentos, videoconferências e follow-ups",
-        icon: Calendar,
+        icon: MdDateRange,
         color: "text-blue-500",
         bgColor: "bg-blue-500/10",
         borderColor: "border-blue-500/40",
@@ -117,7 +120,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "atendimento",
         name: "Atendimento",
         description: "Suporte ao cliente, SAC e tickets",
-        icon: Headphones,
+        icon: MdHeadsetMic,
         color: "text-violet-500",
         bgColor: "bg-violet-500/10",
         borderColor: "border-violet-500/40",
@@ -132,7 +135,7 @@ export const WORKSPACE_TEMPLATES: Record<string, WorkspaceTemplateConfig> = {
         id: "rh",
         name: "RH",
         description: "Recrutamento, onboarding e comunicação interna",
-        icon: Users,
+        icon: MdGroups2,
         color: "text-cyan-500",
         bgColor: "bg-cyan-500/10",
         borderColor: "border-cyan-500/40",

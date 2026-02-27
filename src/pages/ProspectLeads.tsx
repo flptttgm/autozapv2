@@ -195,8 +195,8 @@ export default function ProspectLeads() {
   return (
     <div className="min-h-screen bg-background relative">
       {/* Ambient background glows */}
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2" />
-      <div className="absolute top-1/2 right-0 w-[500px] h-[500px] bg-purple-500/5 blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2" />
+      <div className="absolute top-0 left-0 w-full h-[500px] ambient-glow-primary blur-[120px] rounded-full pointer-events-none -translate-y-1/2" />
+      <div className="absolute top-1/2 right-0 w-[500px] h-[500px] ambient-glow-secondary blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2" />
 
       <div className="container max-w-6xl py-6 pb-32 md:pb-6 space-y-6 relative z-10">
         {/* Header */}

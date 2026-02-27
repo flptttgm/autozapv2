@@ -26,7 +26,7 @@ serve(async (req) => {
     // Get user from token
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       throw new Error('Unauthorized');
     }
@@ -51,7 +51,7 @@ serve(async (req) => {
         .from('invites')
         .update({ status: 'expired' })
         .eq('id', invite.id);
-      
+
       throw new Error('Invite has expired');
     }
 
@@ -85,11 +85,43 @@ serve(async (req) => {
       throw memberError;
     }
 
-    // Update user's profile workspace_id
+    // Update user's profile workspace_id to the invited workspace
+    // IMPORTANT: use user_id column, NOT id (profile.id != auth user id)
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .single();
+
+    const oldWorkspaceId = currentProfile?.workspace_id;
+
     await supabase
       .from('profiles')
       .update({ workspace_id: invite.workspace_id })
-      .eq('id', user.id);
+      .eq('user_id', user.id);
+
+    // Clean up the auto-created workspace if it's different from the invite workspace
+    if (oldWorkspaceId && oldWorkspaceId !== invite.workspace_id) {
+      // Remove from old workspace_members
+      await supabase
+        .from('workspace_members')
+        .delete()
+        .eq('workspace_id', oldWorkspaceId)
+        .eq('user_id', user.id);
+
+      // Check if old workspace has no members left, then delete it
+      const { count } = await supabase
+        .from('workspace_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', oldWorkspaceId);
+
+      if (count === 0) {
+        await supabase
+          .from('workspaces')
+          .delete()
+          .eq('id', oldWorkspaceId);
+      }
+    }
 
     // Mark invite as accepted
     await supabase

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, ChevronDown, ChevronRight, Phone } from "lucide-react";
+import { ChevronDown, ChevronRight, Phone } from "lucide-react";
+import { MdCalendarMonth } from "react-icons/md";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,7 +33,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
     queryKey: ["appointments-by-instance", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, byInstance: {} };
-      
+
       const { data, error } = await supabase
         .from("appointments")
         .select("id, status, leads(whatsapp_instance_id)")
@@ -40,12 +41,12 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
         .neq("status", "cancelled")
         .neq("status", "completed")
         .neq("status", "rejected");
-      
+
       if (error) throw error;
-      
+
       const byInstance: Record<string, number> = {};
       let total = 0;
-      
+
       data?.forEach((appointment) => {
         total++;
         const instanceId = appointment.leads?.whatsapp_instance_id;
@@ -53,7 +54,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
           byInstance[instanceId] = (byInstance[instanceId] || 0) + 1;
         }
       });
-      
+
       return { total, byInstance };
     },
     enabled: !!profile?.workspace_id,
@@ -65,7 +66,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
   // Keep open when on appointments route (unless user has manually closed it)
   const isActive = isAppointmentsRoute;
   const effectiveOpen = hasManuallyToggled ? open : (open || isActive);
-  
+
   const handleToggle = (newOpen: boolean) => {
     setOpen(newOpen);
     setHasManuallyToggled(true);
@@ -90,7 +91,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary"
             )}
           >
-            <Calendar className="h-7 w-7" />
+            <MdCalendarMonth className="h-7 w-7" />
             {totalAppointments > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-primary text-primary-foreground text-[11px] font-bold rounded-full flex items-center justify-center">
                 {totalAppointments > 9 ? "9+" : totalAppointments}
@@ -132,7 +133,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary px-3 py-2 text-sm hover:scale-[1.01]"
         )}
       >
-        <Calendar className={cn(
+        <MdCalendarMonth className={cn(
           "shrink-0 transition-all duration-200 ease-out",
           isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
         )} />
@@ -159,7 +160,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary px-3 py-2 text-sm hover:scale-[1.01]"
           )}
         >
-          <Calendar className={cn(
+          <MdCalendarMonth className={cn(
             "shrink-0 transition-all duration-200 ease-out",
             isParentActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
           )} />
@@ -176,7 +177,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
           )}
         </button>
       </CollapsibleTrigger>
-      
+
       <CollapsibleContent className="pl-4 mt-1 space-y-1">
         {/* All appointments */}
         <Link
@@ -198,7 +199,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
         {instances?.map((instance) => {
           const count = appointmentsByInstance[instance.instance_id] || 0;
           const isSelected = selectedInstance === instance.instance_id;
-          
+
           return (
             <Link
               key={instance.instance_id}

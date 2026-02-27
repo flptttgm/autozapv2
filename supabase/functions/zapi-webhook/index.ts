@@ -376,6 +376,66 @@ serve(async (req: Request) => {
       });
     }
 
+    // Handle MessageStatusCallback — Update delivery status (sent/received/read/played)
+    // Handle MessageStatusCallback — Update delivery status (sent/received/read/played)
+    if (payload.type === 'MessageStatusCallback' && payload.ids && Array.isArray(payload.ids)) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+
+      // Map Z-API status to internal delivery_status
+      const statusMap: Record<string, string> = {
+        'SENT': 'sent',
+        'RECEIVED': 'received',
+        'READ': 'read',
+        'READ_BY_ME': 'read',
+        'PLAYED': 'played',
+      };
+
+      const zapiStatus = payload.status?.toUpperCase?.() || '';
+      const deliveryStatus = statusMap[zapiStatus];
+
+      if (deliveryStatus) {
+        // Only update forward (don't downgrade read→received)
+        const statusPriority: Record<string, number> = {
+          'pending': 0,
+          'sent': 1,
+          'received': 2,
+          'read': 3,
+          'played': 4,
+        };
+
+        for (const messageId of payload.ids) {
+          // Find message by zapi_message_id
+          const { data: existingMsg } = await supabase
+            .from('messages')
+            .select('id, delivery_status')
+            .eq('zapi_message_id', messageId)
+            .limit(1)
+            .maybeSingle();
+
+          if (existingMsg) {
+            const currentPriority = statusPriority[existingMsg.delivery_status || 'pending'] || 0;
+            const newPriority = statusPriority[deliveryStatus] || 0;
+
+            if (newPriority > currentPriority) {
+              await supabase
+                .from('messages')
+                .update({ delivery_status: deliveryStatus })
+                .eq('id', existingMsg.id);
+
+              console.log(`[zapi-webhook] ✅ Status updated: ${existingMsg.delivery_status || 'pending'} → ${deliveryStatus} for msg ${messageId}`);
+            }
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, status_updated: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Default response for other events (ack, presence, etc)
     return new Response(JSON.stringify({ success: true, ignored: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

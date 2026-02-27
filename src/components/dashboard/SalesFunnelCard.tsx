@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
@@ -17,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const SalesFunnelCard = ({ className }: { className?: string }) => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: funnelData, isLoading } = useQuery({
     queryKey: ["sales-funnel", profile?.workspace_id],
@@ -30,10 +32,11 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
 
       const counts = {
         new: 0,
-        prospect: 0,
         contacted: 0,
         qualified: 0,
-        converted: 0,
+        proposal: 0,
+        negotiation: 0,
+        won: 0,
       };
 
       data?.forEach((lead) => {
@@ -49,22 +52,16 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
 
       return [
         {
-          name: "Leads Captados",
+          name: "Leads captados",
           value: counts.new,
           icon: Users,
-          color: "neutral",
-        },
-        {
-          name: "Prospecção",
-          value: counts.prospect,
-          icon: Search,
           color: "neutral",
         },
         {
           name: "Contatados",
           value: counts.contacted,
           icon: MessageSquare,
-          color: "green-soft",
+          color: "neutral",
         },
         {
           name: "Qualificados",
@@ -73,8 +70,14 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
           color: "green-soft",
         },
         {
+          name: "Negociação",
+          value: counts.proposal + counts.negotiation,
+          icon: Search,
+          color: "green-soft",
+        },
+        {
           name: "Fechados",
-          value: counts.converted,
+          value: counts.won,
           icon: CheckCircle2,
           color: "green-solid",
         },
@@ -82,6 +85,31 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
     },
     enabled: !!profile?.workspace_id,
   });
+
+  // Real-time subscription: auto-update funnel when any lead status changes
+  useEffect(() => {
+    if (!profile?.workspace_id) return;
+
+    const channel = supabase
+      .channel(`sales-funnel-realtime-${profile.workspace_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leads",
+          filter: `workspace_id=eq.${profile.workspace_id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["sales-funnel"] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.workspace_id, queryClient]);
 
   if (isLoading) {
     const tipSize = "1.5rem";
@@ -131,8 +159,8 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">Funil de Vendas</h2>
-            <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 px-2.5 py-1 rounded-[4px] text-[9px] font-bold uppercase tracking-wider border border-emerald-500/20">
-              Live Pipeline
+            <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 px-2.5 py-1 rounded-[4px] text-[9px] font-bold tracking-wider border border-emerald-500/20">
+              Live pipeline
             </div>
           </div>
           <p className="text-muted-foreground text-sm mt-1">Conversão de leads por estágio do processo</p>
@@ -159,9 +187,7 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
               const tipSize = "1.5rem";
               const isFirst = index === 0;
 
-              const clipPath = isFirst
-                ? `polygon(0 0, calc(100% - ${tipSize}) 0, 100% 50%, calc(100% - ${tipSize}) 100%, 0 100%)`
-                : `polygon(0 0, calc(100% - ${tipSize}) 0, 100% 50%, calc(100% - ${tipSize}) 100%, 0 100%, ${tipSize} 50%)`;
+              const clipPath = `polygon(0 0, calc(100% - ${tipSize}) 0, 100% 50%, calc(100% - ${tipSize}) 100%, 0 100%, ${tipSize} 50%)`;
 
               return (
                 <div
@@ -178,9 +204,9 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
                   >
                     <div className={cn(
                       "flex flex-col justify-center h-full",
-                      !isFirst && "ml-4 sm:ml-6" // Offset text inward for indented arrows
+                      "ml-4 sm:ml-6" // Offset text inward past the arrow indent
                     )}>
-                      <span className="text-[10px] sm:text-xs font-bold tracking-widest uppercase opacity-70 mb-0.5">
+                      <span className="text-[10px] sm:text-xs font-bold tracking-wide opacity-70 mb-0.5">
                         {step.name}
                       </span>
                       <span className="text-2xl sm:text-3xl font-bold tracking-tight leading-none">
@@ -214,22 +240,22 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
             <div className="p-4 rounded-full bg-muted border border-dashed border-border">
               <Users className="h-8 w-8 opacity-50" />
             </div>
-            <p className="font-medium text-sm uppercase tracking-widest">Pipeline Vazio</p>
+            <p className="font-medium text-sm tracking-wide">Pipeline vazio</p>
           </div>
         )}
 
         {/* Footer Metrics */}
         <div className="mt-8 pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-6 px-2 sm:px-8">
           <div className="flex flex-col items-center sm:items-start">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Cac Médio</span>
+            <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">CAC médio</span>
             <span className="text-xl font-bold text-foreground leading-none">R$ 12,40</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Conversão Total</span>
+            <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">Conversão total</span>
             <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-500 leading-none">{conversionRate}%</span>
           </div>
           <div className="flex flex-col items-center sm:items-end">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Ticket Médio</span>
+            <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">Ticket médio</span>
             <span className="text-xl font-bold text-foreground leading-none">R$ 2.450</span>
           </div>
         </div>

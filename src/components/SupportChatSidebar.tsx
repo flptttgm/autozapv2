@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, LifeBuoy, Trash2, ExternalLink, Loader2, Zap } from "lucide-react";
+import { X, Send, Trash2, ExternalLink, Loader2, Zap, Wifi, MessageCircleQuestion, BookOpen, HelpCircle } from "lucide-react";
+import { MdSupportAgent } from "react-icons/md";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -304,7 +305,7 @@ Nossa equipe técnica responderá em breve!
 
 [ABRIR CHAMADO]`
   },
-"funcionalidades": {
+  "funcionalidades": {
     keywords: ["funcionalidades", "recursos", "como usar", "tutorial", "ajuda", "o que posso fazer"],
     question: "Quais são as funcionalidades da plataforma?",
     answer: `O Appi AutoZap oferece:
@@ -378,10 +379,10 @@ Nossa equipe técnica responderá em breve!
 };
 
 const QUICK_SUGGESTIONS = [
-  { label: "Como conectar o WhatsApp?", faqKey: "conectar-whatsapp" },
-  { label: "O que é Modo Seletivo?", faqKey: "modo-seletivo" },
-  { label: "Como funcionam orçamentos?", faqKey: "orcamentos" },
-  { label: "Tenho outra dúvida", faqKey: null },
+  { label: "Como conectar o WhatsApp?", faqKey: "conectar-whatsapp", icon: Wifi },
+  { label: "O que é Modo Seletivo?", faqKey: "modo-seletivo", icon: BookOpen },
+  { label: "Como funcionam orçamentos?", faqKey: "orcamentos", icon: MessageCircleQuestion },
+  { label: "Tenho outra dúvida", faqKey: null, icon: HelpCircle },
 ];
 
 const SUPPORT_URL = SUPPORT_TICKET_URL;
@@ -407,24 +408,24 @@ const routeMap: Record<string, string> = {
 // ============================================
 function matchFAQ(userMessage: string): FAQEntry | null {
   const normalizedMessage = userMessage.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
+
   let bestMatch: { entry: FAQEntry; score: number } | null = null;
-  
+
   for (const [, faq] of Object.entries(FAQ_DATABASE)) {
     let score = 0;
-    
+
     for (const keyword of faq.keywords) {
       const normalizedKeyword = keyword.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (normalizedMessage.includes(normalizedKeyword)) {
         score += normalizedKeyword.length;
       }
     }
-    
+
     if (score > 0 && (!bestMatch || score > bestMatch.score)) {
       bestMatch = { entry: faq, score };
     }
   }
-  
+
   return bestMatch && bestMatch.score >= 5 ? bestMatch.entry : null;
 }
 
@@ -452,11 +453,10 @@ const OpenTicketButton = ({ isMobile }: { isMobile?: boolean }) => (
     href={SUPPORT_URL}
     target="_blank"
     rel="noopener noreferrer"
-    className={`inline-flex items-center gap-2 mt-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium ${
-      isMobile ? "px-5 py-3 text-base min-h-[48px]" : "px-4 py-2"
-    }`}
+    className={`inline-flex items-center gap-2 mt-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all duration-200 font-medium shadow-md hover:shadow-lg hover:scale-[1.02] ${isMobile ? "px-5 py-3 text-base min-h-[48px]" : "px-4 py-2.5"
+      }`}
   >
-    <LifeBuoy className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+    <MdSupportAgent className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
     Abrir Chamado
     <ExternalLink className={isMobile ? "h-4 w-4" : "h-3 w-3"} />
   </a>
@@ -469,29 +469,48 @@ interface QuickSuggestionButtonsProps {
 }
 
 const QuickSuggestionButtons = ({ onSelect, disabled, isMobile }: QuickSuggestionButtonsProps) => (
-  <div className={`flex flex-wrap gap-2 mt-3 ${isMobile ? "gap-3" : ""}`}>
-    {QUICK_SUGGESTIONS.map((suggestion, idx) => (
-      <button
-        key={idx}
-        onClick={() => onSelect(suggestion)}
-        disabled={disabled}
-        className={`bg-background border border-border rounded-full hover:bg-primary/10 hover:border-primary/30 transition-colors text-foreground disabled:opacity-50 disabled:cursor-not-allowed ${
-          isMobile 
-            ? "px-4 py-3 text-base min-h-[48px]" 
-            : "px-3 py-1.5 text-sm"
-        }`}
-      >
-        {suggestion.label}
-      </button>
-    ))}
+  <div className={`flex flex-wrap gap-2 mt-4 ${isMobile ? "gap-3" : ""}`}>
+    {QUICK_SUGGESTIONS.map((suggestion, idx) => {
+      const Icon = suggestion.icon;
+      return (
+        <button
+          key={idx}
+          onClick={() => onSelect(suggestion)}
+          disabled={disabled}
+          className={`group flex items-center gap-2 bg-background border border-border/60 rounded-xl hover:bg-primary/10 hover:border-primary/40 hover:shadow-sm transition-all duration-200 text-foreground disabled:opacity-50 disabled:cursor-not-allowed ${isMobile
+              ? "px-4 py-3 text-base min-h-[48px]"
+              : "px-3.5 py-2 text-sm"
+            }`}
+        >
+          <Icon className={`shrink-0 text-primary/70 group-hover:text-primary transition-colors ${isMobile ? "h-5 w-5" : "h-4 w-4"
+            }`} />
+          {suggestion.label}
+        </button>
+      );
+    })}
   </div>
 );
 
 const InstantBadge = () => (
-  <span className="inline-flex items-center gap-1 text-xs text-primary mb-2">
+  <span className="inline-flex items-center gap-1 text-xs text-primary mb-2 bg-primary/10 px-2 py-0.5 rounded-full">
     <Zap className="h-3 w-3" />
     Resposta instantânea
   </span>
+);
+
+const TypingIndicator = () => (
+  <div className="flex items-center gap-1 px-2 py-1">
+    <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+    <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+  </div>
+);
+
+const BotAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => (
+  <div className={`shrink-0 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shadow-sm ${size === "md" ? "h-9 w-9" : "h-7 w-7"
+    }`}>
+    <MdSupportAgent className={`text-primary ${size === "md" ? "h-5 w-5" : "h-4 w-4"}`} />
+  </div>
 );
 
 const parseActions = (content: string) => {
@@ -521,7 +540,7 @@ async function streamSupportChat(
 ) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session?.access_token) {
       throw new Error("Usuário não autenticado");
     }
@@ -639,14 +658,17 @@ const ChatContent = ({
     <div className="flex flex-col h-full">
       {/* Header - Desktop only (mobile uses DrawerHeader) */}
       {!isMobile && (
-        <div className="flex items-center justify-between p-4 border-b border-border bg-primary/5">
+        <div className="flex items-center justify-between p-4 border-b border-border/50 bg-gradient-to-r from-primary/8 via-primary/5 to-transparent backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <LifeBuoy className="h-5 w-5 text-primary" />
+            <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-sm">
+              <MdSupportAgent className="h-5 w-5 text-primary" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-emerald-500 rounded-full border-2 border-card">
+                <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+              </span>
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Suporte Appi AutoZap</h2>
-              <p className="text-xs text-muted-foreground">Estamos aqui para ajudar!</p>
+              <p className="text-xs text-emerald-500 font-medium flex items-center gap-1">● Online agora</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -655,7 +677,7 @@ const ChatContent = ({
                 variant="ghost"
                 size="icon"
                 onClick={clearHistory}
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                 title="Limpar conversa"
               >
                 <Trash2 className="h-4 w-4" />
@@ -674,8 +696,8 @@ const ChatContent = ({
       )}
 
       {/* Messages */}
-      <ScrollArea 
-        className={`flex-1 ${isMobile ? "px-4 py-3" : "p-4"}`} 
+      <ScrollArea
+        className={`flex-1 ${isMobile ? "px-4 py-3" : "p-4"}`}
         ref={scrollRef}
       >
         <div className={`space-y-4 ${isMobile ? "pb-2" : ""}`}>
@@ -687,19 +709,22 @@ const ChatContent = ({
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                transition={{ duration: 0.3 }}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start items-end gap-2"}`}
               >
+                {message.role === "assistant" && (
+                  <BotAvatar size={isMobile ? "md" : "sm"} />
+                )}
                 <div
-                  className={`rounded-2xl ${isMobile ? "max-w-[90%] px-4 py-3" : "max-w-[85%] px-4 py-3"} ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground"
-                  }`}
+                  className={`rounded-2xl ${isMobile ? "max-w-[85%] px-4 py-3" : "max-w-[80%] px-4 py-3"} ${message.role === "user"
+                      ? "bg-gradient-to-br from-primary to-primary/85 text-primary-foreground shadow-md shadow-primary/20"
+                      : "bg-muted/80 text-foreground shadow-sm border border-border/30"
+                    }`}
                 >
                   {message.role === "assistant" && message.isInstant && (
                     <InstantBadge />
                   )}
-                  
+
                   <ReactMarkdown components={markdownComponents}>
                     {cleanContent}
                   </ReactMarkdown>
@@ -734,10 +759,11 @@ const ChatContent = ({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex justify-start"
+              className="flex justify-start items-end gap-2"
             >
-              <div className="bg-muted rounded-2xl px-4 py-3">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <BotAvatar size={isMobile ? "md" : "sm"} />
+              <div className="bg-muted/80 rounded-2xl px-4 py-3 shadow-sm border border-border/30">
+                <TypingIndicator />
               </div>
             </motion.div>
           )}
@@ -745,35 +771,36 @@ const ChatContent = ({
       </ScrollArea>
 
       {/* Input */}
-      <div 
-        className={`border-t border-border bg-background/80 backdrop-blur-sm ${
-          isMobile 
-            ? "p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" 
+      <div
+        className={`border-t border-border/50 bg-gradient-to-t from-background via-background to-background/80 backdrop-blur-sm ${isMobile
+            ? "p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
             : "p-4"
-        }`}
+          }`}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSend();
           }}
-          className="flex gap-3"
+          className="flex gap-2.5"
         >
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Descreva seu problema..."
+            placeholder="Como podemos ajudar você?"
             disabled={isLoading}
-            className={`flex-1 ${isMobile ? "h-12 text-base" : ""}`}
+            className={`flex-1 rounded-xl border-border/60 focus-visible:border-primary/50 focus-visible:ring-primary/20 transition-all ${isMobile ? "h-12 text-base" : ""
+              }`}
           />
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             size={isMobile ? "default" : "icon"}
             disabled={isLoading || !input.trim()}
-            className={isMobile ? "h-12 w-12" : ""}
+            className={`rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 disabled:hover:scale-100 ${isMobile ? "h-12 w-12" : ""
+              }`}
           >
-            <Send className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+            <Send className={`transition-transform ${isMobile ? "h-5 w-5" : "h-4 w-4"}`} />
           </Button>
         </form>
       </div>
@@ -926,15 +953,18 @@ export function SupportChatSidebar({ isOpen, onClose }: SupportChatSidebarProps)
     return (
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DrawerContent className="h-[85vh] max-h-[85vh]">
-          <DrawerHeader className="border-b border-border bg-primary/5 pb-3">
+          <DrawerHeader className="border-b border-border/50 bg-gradient-to-r from-primary/8 via-primary/5 to-transparent pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <LifeBuoy className="h-5 w-5 text-primary" />
+                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-sm">
+                  <MdSupportAgent className="h-5 w-5 text-primary" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-emerald-500 rounded-full border-2 border-card">
+                    <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                  </span>
                 </div>
                 <div>
                   <DrawerTitle className="text-left">Suporte Autozap</DrawerTitle>
-                  <p className="text-xs text-muted-foreground text-left">Estamos aqui para ajudar!</p>
+                  <p className="text-xs text-emerald-500 font-medium text-left flex items-center gap-1">● Online agora</p>
                 </div>
               </div>
               {messages.length > 1 && (
@@ -942,7 +972,7 @@ export function SupportChatSidebar({ isOpen, onClose }: SupportChatSidebarProps)
                   variant="ghost"
                   size="icon"
                   onClick={clearHistory}
-                  className="h-10 w-10"
+                  className="h-10 w-10 hover:bg-destructive/10 hover:text-destructive"
                   title="Limpar conversa"
                 >
                   <Trash2 className="h-5 w-5" />

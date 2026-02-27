@@ -584,6 +584,44 @@ All colors MUST be HSL.
   --epr-category-label-height: 28px;
 }
 
+/* ─── Ambient Glow Classes (theme-aware) ─────────────────────── */
+/* Light theme: silver/graphite glow | Dark/Antigravity: keeps original green/purple */
+.ambient-glow-primary {
+  background-color: hsl(210 10% 50% / 0.07);
+}
+
+.ambient-glow-secondary {
+  background-color: hsl(220 10% 45% / 0.06);
+}
+
+.dark .ambient-glow-primary {
+  background-color: hsl(142 70% 50% / 0.05);
+}
+
+.dark .ambient-glow-secondary {
+  background-color: hsl(270 60% 50% / 0.05);
+}
+
+.antigravity .ambient-glow-primary {
+  background-color: hsl(var(--primary) / 0.05);
+}
+
+.antigravity .ambient-glow-secondary {
+  background-color: hsl(270 60% 50% / 0.05);
+}
+
+/* Chat header subtle background - silver tint on light, transparent on dark */
+.chat-header-bg {
+  background-color: hsl(210 10% 92% / 0.1);
+  backdrop-filter: blur(2px);
+}
+
+.dark .chat-header-bg,
+.antigravity .chat-header-bg {
+  background-color: transparent;
+  backdrop-filter: none;
+}
+
 @layer utilities {
   .bg-noise {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
@@ -619,10 +657,10 @@ All colors MUST be HSL.
   background-color: hsl(var(--muted));
   background-image:
     linear-gradient(to bottom,
-      hsl(var(--muted) / 0.45),
-      hsl(var(--muted) / 0.45)),
-    url('/images/whatsapp-doodle-light.jpg');
-  background-size: cover, 400px 400px;
+      hsl(var(--muted) / 0.25),
+      hsl(var(--muted) / 0.25)),
+    url('/images/whatsapp-doodle-light.png');
+  background-size: cover, 506px 506px;
   background-repeat: no-repeat, repeat;
   background-position: center, center;
 }
@@ -632,10 +670,10 @@ All colors MUST be HSL.
   background-color: hsl(var(--background));
   background-image:
     linear-gradient(to bottom,
-      hsl(var(--background) / 0.4),
-      hsl(var(--background) / 0.4)),
-    url('/images/whatsapp-doodle-dark.jpg');
-  background-size: cover, 400px 400px;
+      hsl(var(--background) / 0.2),
+      hsl(var(--background) / 0.2)),
+    url('/images/whatsapp-doodle-dark.png');
+  background-size: cover, 440px 440px;
   background-repeat: no-repeat, repeat;
   background-position: center, center;
 }

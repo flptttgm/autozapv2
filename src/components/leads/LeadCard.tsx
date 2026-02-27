@@ -36,12 +36,6 @@ const STATUS_CONFIG = {
     text: "text-sky-700 dark:text-sky-300",
     dot: "bg-sky-500"
   },
-  prospect: {
-    label: "Prospecção",
-    bg: "bg-cyan-500/10 dark:bg-cyan-500/20",
-    text: "text-cyan-700 dark:text-cyan-300",
-    dot: "bg-cyan-500"
-  },
   contacted: {
     label: "Contatado",
     bg: "bg-amber-500/10 dark:bg-amber-500/20",
@@ -54,8 +48,20 @@ const STATUS_CONFIG = {
     text: "text-violet-700 dark:text-violet-300",
     dot: "bg-violet-500"
   },
-  converted: {
-    label: "Convertido",
+  proposal: {
+    label: "Proposta",
+    bg: "bg-cyan-500/10 dark:bg-cyan-500/20",
+    text: "text-cyan-700 dark:text-cyan-300",
+    dot: "bg-cyan-500"
+  },
+  negotiation: {
+    label: "Negociação",
+    bg: "bg-orange-500/10 dark:bg-orange-500/20",
+    text: "text-orange-700 dark:text-orange-300",
+    dot: "bg-orange-500"
+  },
+  won: {
+    label: "Fechado",
     bg: "bg-emerald-500/10 dark:bg-emerald-500/20",
     text: "text-emerald-700 dark:text-emerald-300",
     dot: "bg-emerald-500"

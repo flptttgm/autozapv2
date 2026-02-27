@@ -2,6 +2,8 @@ import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, BrainCog, X, PanelLeftClose, Building2 } from "lucide-react";
+import { MdSupportAgent, MdCast, MdCastConnected, MdDashboard, MdOutlineAppRegistration } from "react-icons/md";
+import { HiOutlineGift } from "react-icons/hi";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { AIPromotionBanner } from "@/components/AIPromotionBanner";
 import { useSidebarVisibility } from "@/hooks/useSidebarVisibility";
 import { useUserWorkspaces } from "@/hooks/useUserWorkspaces";
+import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { getWorkspaceTemplate } from "@/lib/workspaceTemplates";
 
 interface LayoutProps {
@@ -40,6 +43,7 @@ const Layout = ({ children }: LayoutProps) => {
   const { activeWorkspace } = useUserWorkspaces();
   const activeTemplate = getWorkspaceTemplate(activeWorkspace?.template);
   const templateItems = activeTemplate.sidebarItems;
+  const { connectedCount } = useConnectedWhatsAppInstances(activeWorkspace?.id);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar-collapsed') === 'true';
@@ -91,12 +95,12 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Navigation grouped for visual structure
   const primaryNav = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-    { name: "Workspaces", href: "/workspaces", icon: Building2 },
+    { name: "Dashboard", href: "/dashboard", icon: MdDashboard },
+    { name: "Workspaces", href: "/workspaces", icon: MdOutlineAppRegistration },
   ];
 
   const toolsNav = [
-    { name: "Conexões", href: "/whatsapp", icon: Link2 },
+    { name: "Conexões", href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast },
   ];
 
   const agentsNav = { name: "Agentes", href: "/ai-settings", icon: BrainCog };
@@ -329,7 +333,7 @@ const Layout = ({ children }: LayoutProps) => {
                               "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
                             )}
                           >
-                            <MessageSquareText className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                            <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
                             <span className="lg:hidden">Suporte</span>
                           </button>
                         </TooltipTrigger>
@@ -346,7 +350,7 @@ const Layout = ({ children }: LayoutProps) => {
                           "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
                         )}
                       >
-                        <MessageSquareText className="h-5 w-5 shrink-0" />
+                        <MdSupportAgent className="h-5 w-5 shrink-0" />
                         <span>Suporte</span>
                       </button>
                     )}
@@ -365,7 +369,7 @@ const Layout = ({ children }: LayoutProps) => {
                                 : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
                             )}
                           >
-                            <Share2 className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                            <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
                             <span className="lg:hidden">Indicações</span>
                           </Link>
                         </TooltipTrigger>
@@ -381,7 +385,7 @@ const Layout = ({ children }: LayoutProps) => {
                             : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
                         )}
                       >
-                        <Share2 className="h-5 w-5 shrink-0" />
+                        <HiOutlineGift className="h-5 w-5 shrink-0" />
                         <span>Indicações</span>
                       </Link>
                     )}

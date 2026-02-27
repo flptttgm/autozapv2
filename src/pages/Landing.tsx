@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LandingAIDemo } from "@/components/landing/LandingAIDemo";
+
 import YouTubeEmbed from "@/components/landing/YouTubeEmbed";
 import videoThumbnail from "@/assets/video-thumbnail.png";
 import { AnimatedStats } from "@/components/landing/AnimatedCounter";
@@ -237,9 +237,6 @@ const Landing = () => {
             <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
               Como Funciona
             </a>
-            <a href="#demo" className="text-muted-foreground hover:text-foreground transition-colors">
-              Demo
-            </a>
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Preços
             </a>
@@ -297,9 +294,6 @@ const Landing = () => {
               </a>
               <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
                 Como Funciona
-              </a>
-              <a href="#demo" className="text-muted-foreground hover:text-foreground transition-colors">
-                Demo
               </a>
               <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                 Preços
@@ -559,37 +553,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Demo Section - Experimente Nossa IA */}
-      <section id="demo" className="py-20 px-4 bg-background">
-        <div className="container mx-auto">
-          <motion.div
-            className="text-center mb-12"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={fadeInUp}
-            transition={{ duration: 0.5 }}
-          >
-            <Badge className="mb-4 bg-primary/10 text-primary border-0">Teste Agora</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">
-              Experimente nossa <span className="text-primary">IA</span> agora mesmo
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Converse com a mesma IA que vai atender seus clientes. Sem compromisso.
-            </p>
-          </motion.div>
 
-          <motion.div
-            className="max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <LandingAIDemo />
-          </motion.div>
-        </div>
-      </section>
 
       {/* Testimonials Section */}
       <section className="py-20 px-4 bg-muted/30">

@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logPlatformAction } from "@/hooks/usePlatformLog";
+import { PresenceProvider } from "@/hooks/useWorkspacePresence";
 
 interface Profile {
   id: string;
@@ -202,7 +203,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile }}>
-      {children}
+      <PresenceProvider userId={user?.id} workspaceId={profile?.workspace_id}>
+        {children}
+      </PresenceProvider>
     </AuthContext.Provider>
   );
 }

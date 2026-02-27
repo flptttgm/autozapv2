@@ -101,7 +101,7 @@ const TranscriptionIndicator = () => (
 const ChatLoadingSkeleton = () => (
   <div className="flex flex-col h-full">
     {/* Header Skeleton */}
-    <div className="p-3 sm:p-4 border-b border-border/40 bg-transparent">
+    <div className="p-3 sm:p-4 border-b border-border/40 chat-header-bg">
       <div className="flex items-center gap-3">
         <Skeleton className="h-8 w-8 rounded" />
         <div className="flex-1 space-y-2">
@@ -338,14 +338,14 @@ const MemoizedSidebarContent = memo(function SidebarContent({
                   onClick={() => setSelectedChatId(chat.chat_id)}
                   className={`group w-full min-w-0 p-3 my-1 rounded-xl cursor-pointer transition-all duration-200 overflow-hidden border ${isSelected
                     ? "bg-primary/10 border-primary/30 shadow-sm"
-                    : "bg-card/30 hover:bg-muted/50 border-transparent hover:border-border/50"
+                    : "bg-muted/40 hover:bg-muted/70 border-border/30 hover:border-border/50"
                     }`}
                 >
                   {/* Outer flex: avatar + content + delete button */}
                   <div className="flex items-start gap-3 min-w-0 w-full">
                     {/* Avatar */}
                     <div className="shrink-0">
-                      <Avatar className="h-11 w-11 transition-all">
+                      <Avatar className="h-14 w-14 transition-all">
                         {leadPhoto ? (
                           <AvatarImage src={leadPhoto} alt={displayName} />
                         ) : null}
@@ -599,9 +599,12 @@ const MemoizedChatContent = memo(function ChatContent({
   const isGroupHeader =
     chatHeader?.isGroup === true ||
     chatHeader?.chat_id?.includes("-group") === true;
+  const rawGroupLeadName = chatHeader?.leads?.name;
+  // For groups: prefer groupName, then lead name (only if it's not a raw numeric ID), then "Grupo"
   const displayName = (
-    chatHeader?.leads?.name ||
-    (isGroupHeader ? chatHeader?.groupName || "Grupo" : terminology.singular)
+    isGroupHeader
+      ? chatHeader?.groupName || (rawGroupLeadName && !/^\d{10,}-group$/i.test(rawGroupLeadName) ? rawGroupLeadName : null) || "Grupo"
+      : rawGroupLeadName || terminology.singular
   ).replace(/^Grupo:\s*/i, "");
   const instancePhone = chatHeader?.instanceId
     ? instancePhoneMap[chatHeader.instanceId]
@@ -621,7 +624,7 @@ const MemoizedChatContent = memo(function ChatContent({
         className="flex flex-col flex-1 min-h-0"
       >
         {/* Header */}
-        <div className="p-3 sm:p-4 border-b border-border/40 bg-transparent">
+        <div className="p-3 sm:p-4 border-b border-border/40 chat-header-bg">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               {/* Back button - mobile only */}
@@ -638,11 +641,16 @@ const MemoizedChatContent = memo(function ChatContent({
 
               {/* Avatar - smaller on mobile */}
               {isGroupHeader ? (
-                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
-                </div>
+                <Avatar className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg">
+                  {headerPhoto ? (
+                    <AvatarImage src={headerPhoto} alt={displayName} className="rounded-lg" />
+                  ) : null}
+                  <AvatarFallback className="bg-blue-500/20 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                  </AvatarFallback>
+                </Avatar>
               ) : (
-                <Avatar className="h-7 w-7 sm:h-8 sm:w-8 shrink-0">
+                <Avatar className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
                   {headerPhoto ? (
                     <AvatarImage src={headerPhoto} alt={displayName} />
                   ) : null}
@@ -824,7 +832,7 @@ const MemoizedChatContent = memo(function ChatContent({
               </div>
 
               <div className="hidden sm:flex items-center gap-4">
-                {chatHeader?.leads?.phone && (
+                {!isGroupHeader && chatHeader?.leads?.phone && (
                   <div className="flex items-center gap-1.5 text-sm">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground font-medium">
@@ -1228,6 +1236,7 @@ const MemoizedChatContent = memo(function ChatContent({
                               {msg.direction !== "inbound" && (
                                 <MessageStatusIndicator
                                   status={(msg as any).delivery_status}
+                                  isAI={msg.direction === "outbound"}
                                 />
                               )}
                             </div>
@@ -1305,11 +1314,9 @@ const MemoizedChatContent = memo(function ChatContent({
               onSendAudio={handleSendAudio}
               onSendImage={handleSendImage}
               onSendDocument={handleSendDocument}
-              isPending={
-                sendMessageMutation.isPending || sendAudioMutation?.isPending
-              }
-              isImagePending={sendImageMutation?.isPending}
-              isDocumentPending={sendDocumentMutation?.isPending}
+              isPending={false}
+              isImagePending={false}
+              isDocumentPending={false}
               quickReplies={quickReplies}
             />
           )}
@@ -2065,10 +2072,20 @@ const Conversations = () => {
           filter: `chat_id=eq.${selectedChatId}`,
         },
         (payload: any) => {
-          // Simplified: react to audio messages with transcription
-          // Don't depend on payload.old which can be unreliable
           const newRecord = payload.new;
 
+          // React to delivery_status changes (sent/received/read/played)
+          if (newRecord?.delivery_status && newRecord.delivery_status !== payload.old?.delivery_status) {
+            console.log(
+              "[Conversations] Delivery status updated, refreshing messages",
+              { messageId: newRecord.id, status: newRecord.delivery_status },
+            );
+            queryClientRef.current.invalidateQueries({
+              queryKey: ["messages", selectedChatId, profile?.workspace_id],
+            });
+          }
+
+          // React to audio messages with transcription
           if (
             newRecord?.message_type === "audio" &&
             newRecord?.metadata?.transcription
@@ -2209,13 +2226,40 @@ const Conversations = () => {
       }
       return data;
     },
-    onSuccess: () => {
-      toast.success("Mensagem enviada!");
+    onMutate: async (messageToSend) => {
+      if (!selectedChatId) return { previousMessages: undefined };
+      const queryKey = ["messages", selectedChatId, profile?.workspace_id];
+      await queryClient.cancelQueries({ queryKey });
+      const previousMessages = queryClient.getQueryData(queryKey);
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        return [...old, {
+          id: `temp-${Date.now()}`,
+          chat_id: selectedChatId,
+          content: messageToSend,
+          direction: "outbound",
+          message_type: "text",
+          created_at: new Date().toISOString(),
+          delivery_status: "pending",
+          metadata: {}
+        }];
+      });
+      return { previousMessages };
     },
-    onError: (error) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
+    },
+    onError: (error, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", selectedChatId, profile?.workspace_id], context.previousMessages);
+      }
       toast.error(
         error instanceof Error ? error.message : "Erro ao enviar mensagem",
       );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
   });
 
@@ -2268,14 +2312,47 @@ const Conversations = () => {
       }
       return data;
     },
+    onMutate: async (variables) => {
+      if (!selectedChatId) return { previousMessages: undefined };
+      const queryKey = ["messages", selectedChatId, profile?.workspace_id];
+      await queryClient.cancelQueries({ queryKey });
+      const previousMessages = queryClient.getQueryData(queryKey);
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        const mediaUrl = variables.audioBase64.startsWith('data:')
+          ? variables.audioBase64
+          : `data:${variables.mimeType};base64,${variables.audioBase64}`;
+
+        return [...old, {
+          id: `temp-${Date.now()}`,
+          chat_id: selectedChatId,
+          content: "[Áudio 🎤]",
+          direction: "outbound",
+          message_type: "audio",
+          created_at: new Date().toISOString(),
+          delivery_status: "pending",
+          metadata: {
+            duration: variables.duration,
+            mediaUrl
+          }
+        }];
+      });
+      return { previousMessages };
+    },
     onSuccess: () => {
-      toast.success("Áudio enviado!");
       queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", selectedChatId, profile?.workspace_id], context.previousMessages);
+      }
       toast.error(
         error instanceof Error ? error.message : "Erro ao enviar áudio",
       );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
   });
 
@@ -2328,14 +2405,46 @@ const Conversations = () => {
       }
       return data;
     },
+    onMutate: async (variables) => {
+      if (!selectedChatId) return { previousMessages: undefined };
+      const queryKey = ["messages", selectedChatId, profile?.workspace_id];
+      await queryClient.cancelQueries({ queryKey });
+      const previousMessages = queryClient.getQueryData(queryKey);
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        const mediaUrl = variables.imageBase64.startsWith('data:')
+          ? variables.imageBase64
+          : `data:${variables.mimeType};base64,${variables.imageBase64}`;
+
+        return [...old, {
+          id: `temp-${Date.now()}`,
+          chat_id: selectedChatId,
+          content: variables.caption || "[Imagem 📷]",
+          direction: "outbound",
+          message_type: "image",
+          created_at: new Date().toISOString(),
+          delivery_status: "pending",
+          metadata: {
+            mediaUrl
+          }
+        }];
+      });
+      return { previousMessages };
+    },
     onSuccess: () => {
-      toast.success("Imagem enviada!");
       queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", selectedChatId, profile?.workspace_id], context.previousMessages);
+      }
       toast.error(
         error instanceof Error ? error.message : "Erro ao enviar imagem",
       );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
   });
 
@@ -2399,14 +2508,48 @@ const Conversations = () => {
       }
       return data;
     },
+    onMutate: async (variables) => {
+      if (!selectedChatId) return { previousMessages: undefined };
+      const queryKey = ["messages", selectedChatId, profile?.workspace_id];
+      await queryClient.cancelQueries({ queryKey });
+      const previousMessages = queryClient.getQueryData(queryKey);
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        const mediaUrl = variables.base64.startsWith('data:')
+          ? variables.base64
+          : `data:${variables.mimeType};base64,${variables.base64}`;
+
+        return [...old, {
+          id: `temp-${Date.now()}`,
+          chat_id: selectedChatId,
+          content: variables.caption || "[Documento 📄]",
+          direction: "outbound",
+          message_type: "document",
+          created_at: new Date().toISOString(),
+          delivery_status: "pending",
+          metadata: {
+            fileName: variables.fileName,
+            extension: variables.extension,
+            mediaUrl
+          }
+        }];
+      });
+      return { previousMessages };
+    },
     onSuccess: () => {
-      toast.success("Documento enviado!");
       queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", selectedChatId, profile?.workspace_id], context.previousMessages);
+      }
       toast.error(
         error instanceof Error ? error.message : "Erro ao enviar documento",
       );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedChatId] });
     },
   });
 
@@ -2618,8 +2761,8 @@ const Conversations = () => {
   return (
     <div className="flex flex-1 w-full h-full min-w-0 overflow-hidden relative">
       {/* Ambient background glows */}
-      <div className="absolute top-0 left-0 w-full h-[300px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 z-0" />
-      <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-purple-500/5 blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2 z-0" />
+      <div className="absolute top-0 left-0 w-full h-[300px] ambient-glow-primary blur-[120px] rounded-full pointer-events-none -translate-y-1/2 z-0" />
+      <div className="absolute top-1/2 right-0 w-[400px] h-[400px] ambient-glow-secondary blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/2 z-0" />
 
       {isMobile ? (
         // Mobile Layout - Either list OR chat, never both

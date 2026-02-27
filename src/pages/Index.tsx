@@ -818,7 +818,9 @@ const Index = () => {
         new: 0,
         contacted: 0,
         qualified: 0,
-        converted: 0,
+        proposal: 0,
+        negotiation: 0,
+        won: 0,
         lost: 0,
       };
 
@@ -831,7 +833,9 @@ const Index = () => {
         new: "Novos",
         contacted: "Contatados",
         qualified: "Qualificados",
-        converted: "Convertidos",
+        proposal: "Proposta",
+        negotiation: "Negociação",
+        won: "Fechados",
         lost: "Perdidos",
       };
 

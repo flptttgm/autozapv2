@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Users, ChevronDown, ChevronRight, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Phone, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { useTerminology } from "@/hooks/useTerminology";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
+import { MdGroupAdd } from "react-icons/md";
 
 interface LeadsSidebarItemProps {
   collapsed: boolean;
@@ -34,22 +35,22 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
     queryKey: ["leads-by-instance", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, newLeads: 0, byInstance: {} };
-      
+
       const { data, error } = await supabase
         .from("leads")
         .select("id, status, whatsapp_instance_id")
         .eq("workspace_id", profile.workspace_id);
-      
+
       if (error) throw error;
-      
+
       const byInstance: Record<string, { total: number; new: number }> = {};
       let total = 0;
       let newLeads = 0;
-      
+
       data?.forEach((lead) => {
         total++;
         if (lead.status === 'new') newLeads++;
-        
+
         const instanceId = lead.whatsapp_instance_id;
         if (instanceId) {
           if (!byInstance[instanceId]) {
@@ -61,7 +62,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
           }
         }
       });
-      
+
       return { total, newLeads, byInstance };
     },
     enabled: !!profile?.workspace_id,
@@ -74,7 +75,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
   // Keep open when on leads route (unless user has manually closed it)
   const isActive = isLeadsRoute;
   const effectiveOpen = hasManuallyToggled ? open : (open || isActive);
-  
+
   const handleToggle = (newOpen: boolean) => {
     setOpen(newOpen);
     setHasManuallyToggled(true);
@@ -99,7 +100,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary"
             )}
           >
-            <Users className="h-7 w-7" />
+            <MdGroupAdd className="h-7 w-7" />
             {totalNewLeads > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-blue-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
                 {totalNewLeads > 9 ? "9+" : totalNewLeads}
@@ -144,7 +145,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary px-3 py-2 text-sm hover:scale-[1.01]"
         )}
       >
-        <Users className={cn(
+        <MdGroupAdd className={cn(
           "shrink-0 transition-all duration-200 ease-out",
           isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
         )} />
@@ -171,7 +172,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground dark:hover:bg-primary/10 dark:hover:text-primary px-3 py-2 text-sm hover:scale-[1.01]"
           )}
         >
-          <Users className={cn(
+          <MdGroupAdd className={cn(
             "shrink-0 transition-all duration-200 ease-out",
             isParentActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
           )} />
@@ -188,7 +189,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
           )}
         </button>
       </CollapsibleTrigger>
-      
+
       <CollapsibleContent className="pl-4 mt-1 space-y-1">
         {/* Prospectar */}
         <Link
@@ -224,7 +225,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
         {instances?.map((instance) => {
           const instanceData = leadsByInstance[instance.instance_id] || { total: 0, new: 0 };
           const isSelected = selectedInstance === instance.instance_id;
-          
+
           return (
             <Link
               key={instance.instance_id}

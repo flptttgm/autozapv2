@@ -41,7 +41,7 @@ serve(async (req) => {
     // Get user's workspace
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('workspace_id, full_name')
+      .select('workspace_id, display_name')
       .eq('user_id', user.id)
       .single();
 
@@ -49,7 +49,7 @@ serve(async (req) => {
       // Try alternative query with 'id' column
       const { data: profileAlt, error: profileAltError } = await supabase
         .from('profiles')
-        .select('workspace_id, full_name')
+        .select('workspace_id, display_name')
         .eq('id', user.id)
         .single();
 
@@ -143,21 +143,29 @@ serve(async (req) => {
     // Send email
     const inviteUrl = `${APP_URL}/accept-invite?token=${invite.token}`;
 
-    await resend.emails.send({
-      from: 'Autozap <noreply@appiautozap.com>',
-      to: [email],
-      subject: `Convite para ${workspace?.name || 'Equipe'}`,
-      html: `
-        <h1>Você foi convidado!</h1>
-        <p><strong>${profile.full_name}</strong> convidou você para fazer parte da equipe <strong>${workspace?.name || 'WhatsApp AI'}</strong>.</p>
-        <p>Como membro ${role === 'admin' ? 'administrador' : 'da equipe'}, você terá acesso a todas as conversas, leads e agendamentos do workspace.</p>
-        <p><a href="${inviteUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0066ff; color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">Aceitar Convite</a></p>
-        <p style="color: #666; font-size: 14px;">Este convite expira em 7 dias.</p>
-        <p style="color: #666; font-size: 12px;">Se você não esperava este convite, pode ignorar este email.</p>
-      `,
-    });
+    let emailSent = false;
+    try {
+      const emailResult = await resend.emails.send({
+        from: 'Autozap <noreply@appiautozap.com>',
+        to: [email],
+        subject: `Convite para ${workspace?.name || 'Equipe'}`,
+        html: `
+          <h1>Você foi convidado!</h1>
+          <p><strong>${profile.display_name || 'Um administrador'}</strong> convidou você para fazer parte da equipe <strong>${workspace?.name || 'WhatsApp AI'}</strong>.</p>
+          <p>Como membro ${role === 'admin' ? 'administrador' : 'da equipe'}, você terá acesso a todas as conversas, leads e agendamentos do workspace.</p>
+          <p><a href="${inviteUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0066ff; color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">Aceitar Convite</a></p>
+          <p style="color: #666; font-size: 14px;">Este convite expira em 7 dias.</p>
+          <p style="color: #666; font-size: 12px;">Se você não esperava este convite, pode ignorar este email.</p>
+        `,
+      });
+      console.log('Resend result:', JSON.stringify(emailResult));
+      emailSent = true;
+    } catch (emailError) {
+      console.error('Failed to send email via Resend:', emailError);
+      // Don't throw - invite was already created, just note the email failed
+    }
 
-    return new Response(JSON.stringify({ success: true, invite }), {
+    return new Response(JSON.stringify({ success: true, invite, invite_url: inviteUrl, email_sent: emailSent }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

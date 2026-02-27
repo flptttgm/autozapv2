@@ -1,15 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { Users, TrendingUp, Heart, Loader2 } from "lucide-react";
-
-export type TerminologyType = "clientes" | "leads" | "pacientes";
+import { Contact, Users, TrendingUp, Heart, Loader2 } from "lucide-react";
+import { useTerminology, TerminologyType } from "@/hooks/useTerminology";
 
 const TERMINOLOGY_OPTIONS = [
+  {
+    value: "contatos" as TerminologyType,
+    label: "Contatos",
+    description: "Para agendas e networking",
+    icon: Contact,
+  },
   {
     value: "clientes" as TerminologyType,
     label: "Clientes",
@@ -32,64 +36,29 @@ const TERMINOLOGY_OPTIONS = [
 
 export const TerminologySelector = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  // Get workspace ID
-  const { data: workspaceId } = useQuery({
-    queryKey: ["user-workspace-id", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("workspace_id")
-        .eq("id", user.id)
-        .single();
-      return profile?.workspace_id;
-    },
-    enabled: !!user?.id,
-  });
-
-  // Get terminology for this workspace
-  const { data: config, isLoading } = useQuery({
-    queryKey: ["terminology_config", workspaceId],
-    queryFn: async () => {
-      if (!workspaceId) return null;
-      const { data, error } = await supabase
-        .from("system_config")
-        .select("config_value")
-        .eq("config_key", "entity_terminology")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.config_value as { type: TerminologyType } | null;
-    },
-    enabled: !!workspaceId,
-  });
-
-  const type: TerminologyType = config?.type || "clientes";
+  const { type, isLoading, ownerWorkspaceId } = useTerminology();
 
   const updateMutation = useMutation({
     mutationFn: async (newType: TerminologyType) => {
-      if (!workspaceId) throw new Error("Workspace não encontrado");
+      if (!ownerWorkspaceId) throw new Error("Workspace não encontrado");
 
-      // Check if config exists for this workspace
+      // Check if config exists for the owner's primary workspace
       const { data: existing } = await supabase
         .from("system_config")
         .select("id")
         .eq("config_key", "entity_terminology")
-        .eq("workspace_id", workspaceId)
+        .eq("workspace_id", ownerWorkspaceId)
         .maybeSingle();
 
       if (existing) {
         const { error } = await supabase
           .from("system_config")
-          .update({ 
+          .update({
             config_value: { type: newType },
             updated_at: new Date().toISOString()
           })
           .eq("config_key", "entity_terminology")
-          .eq("workspace_id", workspaceId);
+          .eq("workspace_id", ownerWorkspaceId);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -97,20 +66,19 @@ export const TerminologySelector = () => {
           .insert({
             config_key: "entity_terminology",
             config_value: { type: newType },
-            workspace_id: workspaceId,
-            description: "Terminologia para entidades (clientes, leads ou pacientes)",
+            workspace_id: ownerWorkspaceId,
           });
         if (error) throw error;
       }
-      
+
       return newType;
     },
-    onSuccess: async (newType) => {
+    onSuccess: async () => {
       toast.success("Terminologia atualizada!");
-      
+
       // Invalidate all terminology-related queries
       await queryClient.invalidateQueries({ queryKey: ["terminology_config"] });
-      
+
       // Force page reload after a short delay to show toast
       setTimeout(() => {
         window.location.reload();
@@ -141,7 +109,7 @@ export const TerminologySelector = () => {
           </div>
         </div>
       )}
-      
+
       <h2 className="text-xl sm:text-2xl font-semibold mb-2">Terminologia</h2>
       <p className="text-muted-foreground mb-6 text-sm sm:text-base">
         Escolha como deseja chamar seus contatos na plataforma
@@ -155,7 +123,7 @@ export const TerminologySelector = () => {
           }
         }}
         disabled={isPending}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {TERMINOLOGY_OPTIONS.map((option) => {
           const Icon = option.icon;
@@ -163,15 +131,13 @@ export const TerminologySelector = () => {
             <Label
               key={option.value}
               htmlFor={option.value}
-              className={`flex flex-col items-center gap-3 p-4 border rounded-lg transition-all ${
-                isPending 
-                  ? "cursor-not-allowed opacity-60" 
+              className={`flex flex-col items-center gap-3 p-4 border rounded-lg transition-all ${isPending
+                  ? "cursor-not-allowed opacity-60"
                   : "cursor-pointer"
-              } ${
-                type === option.value
+                } ${type === option.value
                   ? "border-primary bg-primary/5 ring-2 ring-primary"
                   : "border-border hover:border-primary/50"
-              }`}
+                }`}
             >
               <RadioGroupItem
                 value={option.value}
@@ -190,7 +156,7 @@ export const TerminologySelector = () => {
       </RadioGroup>
 
       <p className="text-sm text-muted-foreground mt-4">
-        💡 Essa configuração altera o nome da página e menus em toda a plataforma
+        💡 Essa configuração altera o nome da página e menus em todos os workspaces
       </p>
     </Card>
   );

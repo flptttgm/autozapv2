@@ -8,7 +8,7 @@ import SEOHead from "@/components/SEOHead";
 import YouTubeEmbed from "@/components/landing/YouTubeEmbed";
 import Logo from "@/components/Logo";
 import PublicFooter from "@/components/PublicFooter";
-import { LandingAIDemo } from "@/components/landing/LandingAIDemo";
+
 import { DemoCarousel } from "@/components/landing/DemoCarousel";
 import videoThumbnail from "@/assets/video-thumbnail.png";
 import { plans as planDefinitions, getShortFeatures, PLAN_PRICES } from "@/lib/plan-definitions";
@@ -628,19 +628,19 @@ const LandingNew = () => {
       {/* Testimonials Section */}
       <Testimonials />
 
-      {/* Demo Section - Experimente Nossa IA */}
+      {/* Platform Preview Section */}
       <section id="demo" className="py-16 md:py-24 bg-secondary/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-1.5 mb-4">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Teste Agora</span>
+              <span className="text-sm font-medium text-primary">Conheça</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Experimente nossa <span className="text-primary">IA</span> agora mesmo
+              Conheça a <span className="text-primary">plataforma</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Converse com a mesma IA que vai atender seus clientes. Sem compromisso.
+              Veja como o Autozap organiza suas conversas, leads e métricas em um só lugar.
             </p>
           </div>
 
