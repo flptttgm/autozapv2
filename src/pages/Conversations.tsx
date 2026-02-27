@@ -248,12 +248,21 @@ const MemoizedSidebarContent = memo(function SidebarContent({
   const getMessagePreviewText = (lastMessage: any, isGroup: boolean) => {
     if (!lastMessage) return "";
 
-    const prefix =
-      lastMessage.direction === "outbound"
-        ? lastMessage.isAI
-          ? "🤖 "
-          : "✓ "
-        : "";
+    let prefix = "";
+    if (lastMessage.direction === "outbound") {
+      if (lastMessage.isAI) {
+        prefix = "🤖 ";
+      } else {
+        const status = lastMessage.deliveryStatus || 'sent';
+        if (status === 'read' || status === 'played') {
+          prefix = "✓✓ "; // blue applied via span in render
+        } else if (status === 'received') {
+          prefix = "✓✓ ";
+        } else {
+          prefix = "✓ ";
+        }
+      }
+    }
 
     switch (lastMessage.messageType) {
       case "audio":
@@ -389,18 +398,34 @@ const MemoizedSidebarContent = memo(function SidebarContent({
                         )}
                       </div>
 
-                      {/* Line 2: Message preview only */}
+                      {/* Line 2: Message preview with delivery status */}
                       <p
-                        className={`text-sm truncate ${chat.unread_count > 0
+                        className={`text-sm truncate flex items-center gap-1 ${chat.unread_count > 0
                           ? "text-foreground font-medium"
                           : "text-muted-foreground"
                           }`}
                         title={rawPreview}
                       >
-                        <AppleEmojiText
-                          text={formatPreviewForList(rawPreview)}
-                          emojiSize={16}
-                        />
+                        {lastMessage?.direction === "outbound" && !lastMessage?.isAI && (
+                          (lastMessage.deliveryStatus === 'read' || lastMessage.deliveryStatus === 'played')
+                            ? <CheckCheck className="h-4 w-4 shrink-0 text-blue-500" />
+                            : (lastMessage.deliveryStatus === 'received')
+                              ? <CheckCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              : <Check className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        {lastMessage?.direction === "outbound" && lastMessage?.isAI && (
+                          <span>🤖 </span>
+                        )}
+                        <span className="truncate">
+                          <AppleEmojiText
+                            text={formatPreviewForList(
+                              lastMessage?.direction === "outbound"
+                                ? getMessagePreviewText(lastMessage, isGroup).replace(/^(🤖 |✓✓ |✓ )/, '')
+                                : rawPreview
+                            )}
+                            emojiSize={16}
+                          />
+                        </span>
                       </p>
 
                       {/* Line 3: Time + Icons */}
@@ -1747,7 +1772,7 @@ const Conversations = () => {
         supabase
           .from("messages")
           .select(
-            "chat_id, lead_id, created_at, content, direction, message_type, metadata, leads(id, name, phone, metadata, status, score, ai_enabled, avatar_url)",
+            "chat_id, lead_id, created_at, content, direction, message_type, metadata, delivery_status, leads(id, name, phone, metadata, status, score, ai_enabled, avatar_url)",
           )
           .eq("workspace_id", profile.workspace_id)
           .order("created_at", { ascending: false })
@@ -1849,6 +1874,7 @@ const Conversations = () => {
               direction: msg.direction,
               messageType: msg.message_type,
               isAI: meta?.respondedByAI === true,
+              deliveryStatus: msg.delivery_status || 'sent',
             },
             _allChatIds: new Set([chatId]),
           });

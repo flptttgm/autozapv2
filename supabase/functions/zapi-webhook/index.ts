@@ -71,6 +71,29 @@ serve(async (req: Request) => {
       } else if (payload.location) {
         content = '[Localização 📍]';
         messageType = 'location';
+      } else if (payload.listMessage) {
+        // Interactive list message (buttons menu)
+        content = payload.listMessage.description || payload.listMessage.title || payload.listMessage.buttonText || '[Lista Interativa]';
+        messageType = 'text';
+      } else if (payload.listResponseMessage) {
+        // User selected an option from a list
+        content = payload.listResponseMessage.title || payload.listResponseMessage.description || '[Resposta de Lista]';
+        messageType = 'text';
+      } else if (payload.buttonsResponseMessage) {
+        // User clicked a button
+        content = payload.buttonsResponseMessage.selectedButtonId || payload.buttonsResponseMessage.selectedDisplayText || '[Botão]';
+        messageType = 'text';
+      } else if (payload.templateMessage) {
+        // Template message (e.g., HSM)
+        content = payload.templateMessage.hydratedTemplate?.hydratedContentText || '[Mensagem de Template]';
+        messageType = 'text';
+      } else if (payload.reaction) {
+        // Z-API reaction format - skip reactions as they don't add conversation value
+        console.log('[Webhook] Skipping reaction message:', payload.reaction?.value);
+        return new Response(JSON.stringify({ ok: true, skipped: 'reaction' }), { status: 200, headers: corsHeaders });
+      } else if (payload.reactionMessage) {
+        content = payload.reactionMessage.text || '[Reação]';
+        messageType = 'reaction';
       } else {
         content = payload.body || payload.caption || '';
       }
