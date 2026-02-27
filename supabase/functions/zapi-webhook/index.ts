@@ -79,9 +79,13 @@ serve(async (req: Request) => {
         // User selected an option from a list
         content = payload.listResponseMessage.title || payload.listResponseMessage.description || '[Resposta de Lista]';
         messageType = 'text';
+      } else if (payload.buttonsMessage) {
+        // Message with interactive buttons
+        content = payload.buttonsMessage.message || payload.buttonsMessage.title || '[Mensagem com Botões]';
+        messageType = 'text';
       } else if (payload.buttonsResponseMessage) {
         // User clicked a button
-        content = payload.buttonsResponseMessage.selectedButtonId || payload.buttonsResponseMessage.selectedDisplayText || '[Botão]';
+        content = payload.buttonsResponseMessage.selectedDisplayText || payload.buttonsResponseMessage.selectedButtonId || '[Botão]';
         messageType = 'text';
       } else if (payload.templateMessage) {
         // Template message (e.g., HSM)
@@ -448,7 +452,150 @@ serve(async (req: Request) => {
       });
     }
 
-    // Handle MessageStatusCallback — Update delivery status (sent/received/read/played)
+    // ═══════════════════════════════════════════════════════════════
+    // Handle fromMe messages — Messages sent directly from WhatsApp
+    // Save as outbound_manual so they appear in Autozap conversations
+    // ═══════════════════════════════════════════════════════════════
+    if (payload.type === 'ReceivedCallback' && payload.fromMe) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+
+      let phone = payload.phone;
+      const messageId = payload.messageId;
+      const instanceId = payload.instanceId;
+
+      if (!phone || !instanceId) {
+        return new Response(JSON.stringify({ ignored: true }), { headers: corsHeaders });
+      }
+
+      // Skip reactions from self
+      if (payload.reaction) {
+        return new Response(JSON.stringify({ ok: true, skipped: 'self_reaction' }), { status: 200, headers: corsHeaders });
+      }
+
+      // Deduplication
+      if (messageId) {
+        const { data: existingMsg } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('zapi_message_id', messageId)
+          .limit(1);
+
+        if (existingMsg && existingMsg.length > 0) {
+          return new Response(JSON.stringify({ status: 'skipped', reason: 'duplicate_fromMe' }), { headers: corsHeaders });
+        }
+      }
+
+      // Normalize phone
+      if (phone && !phone.includes('@')) {
+        const digitsOnly = phone.replace(/\D/g, '');
+        if (!digitsOnly.startsWith('55')) {
+          phone = '55' + digitsOnly;
+        } else {
+          phone = digitsOnly;
+        }
+      }
+
+      // Detect content (same logic as inbound)
+      let content = '';
+      let messageType = 'text';
+
+      if (payload.text?.message) {
+        content = payload.text.message;
+        messageType = 'text';
+      } else if (payload.image) {
+        content = payload.image.caption || '[Imagem 📷]';
+        messageType = 'image';
+      } else if (payload.audio) {
+        content = '[Áudio 🎤]';
+        messageType = 'audio';
+      } else if (payload.video) {
+        content = payload.video.caption || '[Vídeo 🎬]';
+        messageType = 'video';
+      } else if (payload.document) {
+        content = payload.document.fileName || '[Documento 📄]';
+        messageType = 'document';
+      } else if (payload.listMessage) {
+        content = payload.listMessage.description || payload.listMessage.title || '[Lista Interativa]';
+        messageType = 'text';
+      } else if (payload.buttonsMessage) {
+        content = payload.buttonsMessage.message || '[Mensagem com Botões]';
+        messageType = 'text';
+      } else {
+        content = payload.body || payload.caption || '';
+      }
+
+      if (!content) {
+        return new Response(JSON.stringify({ ignored: true, reason: 'empty_fromMe' }), { headers: corsHeaders });
+      }
+
+      // Resolve workspace
+      const { data: instance } = await supabase
+        .from('whatsapp_instances')
+        .select('workspace_id')
+        .eq('instance_id', instanceId)
+        .maybeSingle();
+
+      if (!instance) {
+        return new Response(JSON.stringify({ error: 'unknown_instance' }), { headers: corsHeaders });
+      }
+
+      // Find lead (don't create — if no lead exists for this phone, skip)
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('workspace_id', instance.workspace_id)
+        .eq('phone', phone)
+        .maybeSingle();
+
+      if (!lead) {
+        // Try without country code
+        const phoneShort = phone.startsWith('55') ? phone.substring(2) : phone;
+        const { data: leadShort } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('workspace_id', instance.workspace_id)
+          .eq('phone', phoneShort)
+          .maybeSingle();
+
+        if (!leadShort) {
+          console.log('[zapi-webhook] fromMe: no matching lead found for', phone);
+          return new Response(JSON.stringify({ ignored: true, reason: 'no_lead_for_fromMe' }), { headers: corsHeaders });
+        }
+
+        // Use the short phone lead
+        await supabase.from('messages').insert({
+          workspace_id: instance.workspace_id,
+          lead_id: leadShort.id,
+          chat_id: phone,
+          content,
+          direction: 'outbound_manual',
+          message_type: messageType,
+          zapi_message_id: messageId,
+          metadata: { source: 'whatsapp_direct', senderName: payload.senderName || '' }
+        });
+      } else {
+        await supabase.from('messages').insert({
+          workspace_id: instance.workspace_id,
+          lead_id: lead.id,
+          chat_id: phone,
+          content,
+          direction: 'outbound_manual',
+          message_type: messageType,
+          zapi_message_id: messageId,
+          metadata: { source: 'whatsapp_direct', senderName: payload.senderName || '' }
+        });
+      }
+
+      console.log('[zapi-webhook] ✅ fromMe message saved as outbound_manual:', messageId);
+
+      return new Response(JSON.stringify({ success: true, fromMe: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Handle MessageStatusCallback — Update delivery status (sent/received/read/played)
     if (payload.type === 'MessageStatusCallback' && payload.ids && Array.isArray(payload.ids)) {
       const supabase = createClient(
