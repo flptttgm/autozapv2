@@ -465,8 +465,9 @@ serve(async (req: Request) => {
       let phone = payload.phone;
       const messageId = payload.messageId;
       const instanceId = payload.instanceId;
+      const chatLid = payload.chatLid || null;
 
-      if (!phone || !instanceId) {
+      if (!instanceId) {
         return new Response(JSON.stringify({ ignored: true }), { headers: corsHeaders });
       }
 
@@ -485,16 +486,6 @@ serve(async (req: Request) => {
 
         if (existingMsg && existingMsg.length > 0) {
           return new Response(JSON.stringify({ status: 'skipped', reason: 'duplicate_fromMe' }), { headers: corsHeaders });
-        }
-      }
-
-      // Normalize phone
-      if (phone && !phone.includes('@')) {
-        const digitsOnly = phone.replace(/\D/g, '');
-        if (!digitsOnly.startsWith('55')) {
-          phone = '55' + digitsOnly;
-        } else {
-          phone = digitsOnly;
         }
       }
 
@@ -517,6 +508,9 @@ serve(async (req: Request) => {
       } else if (payload.document) {
         content = payload.document.fileName || '[Documento 📄]';
         messageType = 'document';
+      } else if (payload.sticker) {
+        content = '[Figurinha]';
+        messageType = 'sticker';
       } else if (payload.listMessage) {
         content = payload.listMessage.description || payload.listMessage.title || '[Lista Interativa]';
         messageType = 'text';
@@ -542,54 +536,158 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({ error: 'unknown_instance' }), { headers: corsHeaders });
       }
 
-      // Find lead (don't create — if no lead exists for this phone, skip)
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('workspace_id', instance.workspace_id)
-        .eq('phone', phone)
-        .maybeSingle();
+      // ── Resolve the real phone/chat_id and lead ──
+      // Z-API sends LID format (e.g. "124176614592651@lid") for fromMe messages
+      // instead of the real phone number. We need to resolve this.
+      let resolvedChatId: string | null = null;
+      let resolvedLeadId: string | null = null;
 
-      if (!lead) {
-        // Try without country code
-        const phoneShort = phone.startsWith('55') ? phone.substring(2) : phone;
-        const { data: leadShort } = await supabase
+      const isLidFormat = phone && phone.includes('@lid');
+
+      if (isLidFormat && chatLid) {
+        // Strategy 1: Find existing messages in this workspace that have this chatLid in metadata
+        const { data: existingMessages } = await supabase
+          .from('messages')
+          .select('chat_id, lead_id')
+          .eq('workspace_id', instance.workspace_id)
+          .contains('metadata', { chatLid: chatLid })
+          .limit(1);
+
+        if (existingMessages && existingMessages.length > 0) {
+          resolvedChatId = existingMessages[0].chat_id;
+          resolvedLeadId = existingMessages[0].lead_id;
+          console.log('[zapi-webhook] fromMe: resolved LID via metadata chatLid:', chatLid, '→', resolvedChatId);
+        }
+
+        // Strategy 2: Search by chatName in leads table
+        if (!resolvedChatId && payload.chatName) {
+          const { data: leadByName } = await supabase
+            .from('leads')
+            .select('id, phone')
+            .eq('workspace_id', instance.workspace_id)
+            .ilike('name', payload.chatName)
+            .limit(1);
+
+          if (leadByName && leadByName.length > 0) {
+            resolvedChatId = leadByName[0].phone;
+            resolvedLeadId = leadByName[0].id;
+            console.log('[zapi-webhook] fromMe: resolved LID via chatName:', payload.chatName, '→', resolvedChatId);
+          }
+        }
+
+        // Strategy 3: Find the most recent inbound message from this workspace that has matching chatLid
+        if (!resolvedChatId) {
+          const { data: recentInbound } = await supabase
+            .from('messages')
+            .select('chat_id, lead_id')
+            .eq('workspace_id', instance.workspace_id)
+            .eq('direction', 'inbound')
+            .not('chat_id', 'like', '%@%')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          // Check debug_logs for a recent inbound from same chatLid
+          if (recentInbound && recentInbound.length > 0) {
+            // Find by checking debug_logs for inbound messages with this chatLid
+            const { data: inboundWithLid } = await supabase
+              .from('debug_logs')
+              .select('data')
+              .filter('data->>chatLid', 'eq', chatLid)
+              .filter('data->>fromMe', 'eq', 'false')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (inboundWithLid && inboundWithLid.length > 0) {
+              const inboundPhone = (inboundWithLid[0].data as any)?.phone;
+              if (inboundPhone && !inboundPhone.includes('@')) {
+                // Found the real phone! Now find the lead
+                const { data: leadByPhone } = await supabase
+                  .from('leads')
+                  .select('id')
+                  .eq('workspace_id', instance.workspace_id)
+                  .eq('phone', inboundPhone)
+                  .maybeSingle();
+
+                if (leadByPhone) {
+                  resolvedChatId = inboundPhone;
+                  resolvedLeadId = leadByPhone.id;
+                  console.log('[zapi-webhook] fromMe: resolved LID via debug_logs:', chatLid, '→', resolvedChatId);
+                }
+              }
+            }
+          }
+        }
+
+        if (!resolvedChatId) {
+          console.log('[zapi-webhook] fromMe: could not resolve LID', chatLid, 'chatName:', payload.chatName);
+          return new Response(JSON.stringify({ ignored: true, reason: 'unresolvable_lid' }), { headers: corsHeaders });
+        }
+      } else {
+        // Normal phone format — normalize and find lead
+        if (phone && !phone.includes('@')) {
+          const digitsOnly = phone.replace(/\D/g, '');
+          if (!digitsOnly.startsWith('55')) {
+            phone = '55' + digitsOnly;
+          } else {
+            phone = digitsOnly;
+          }
+        }
+
+        resolvedChatId = phone;
+
+        // Find lead
+        const { data: lead } = await supabase
           .from('leads')
           .select('id')
           .eq('workspace_id', instance.workspace_id)
-          .eq('phone', phoneShort)
+          .eq('phone', phone)
           .maybeSingle();
 
-        if (!leadShort) {
+        if (lead) {
+          resolvedLeadId = lead.id;
+        } else {
+          // Try without country code
+          const phoneShort = phone.startsWith('55') ? phone.substring(2) : phone;
+          const { data: leadShort } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('workspace_id', instance.workspace_id)
+            .eq('phone', phoneShort)
+            .maybeSingle();
+
+          if (leadShort) {
+            resolvedLeadId = leadShort.id;
+          }
+        }
+
+        if (!resolvedLeadId) {
           console.log('[zapi-webhook] fromMe: no matching lead found for', phone);
           return new Response(JSON.stringify({ ignored: true, reason: 'no_lead_for_fromMe' }), { headers: corsHeaders });
         }
-
-        // Use the short phone lead
-        await supabase.from('messages').insert({
-          workspace_id: instance.workspace_id,
-          lead_id: leadShort.id,
-          chat_id: phone,
-          content,
-          direction: 'outbound_manual',
-          message_type: messageType,
-          zapi_message_id: messageId,
-          metadata: { source: 'whatsapp_direct', senderName: payload.senderName || '' }
-        });
-      } else {
-        await supabase.from('messages').insert({
-          workspace_id: instance.workspace_id,
-          lead_id: lead.id,
-          chat_id: phone,
-          content,
-          direction: 'outbound_manual',
-          message_type: messageType,
-          zapi_message_id: messageId,
-          metadata: { source: 'whatsapp_direct', senderName: payload.senderName || '' }
-        });
       }
 
-      console.log('[zapi-webhook] ✅ fromMe message saved as outbound_manual:', messageId);
+      // Save the message as outbound_manual
+      const { error: insertError } = await supabase.from('messages').insert({
+        workspace_id: instance.workspace_id,
+        lead_id: resolvedLeadId,
+        chat_id: resolvedChatId,
+        content,
+        direction: 'outbound_manual',
+        message_type: messageType,
+        zapi_message_id: messageId,
+        metadata: {
+          source: 'whatsapp_direct',
+          senderName: payload.senderName || '',
+          chatLid: chatLid,
+        }
+      });
+
+      if (insertError) {
+        console.error('[zapi-webhook] fromMe: insert error:', insertError);
+        return new Response(JSON.stringify({ error: 'insert_failed' }), { status: 500, headers: corsHeaders });
+      }
+
+      console.log('[zapi-webhook] ✅ fromMe message saved as outbound_manual:', messageId, 'chat:', resolvedChatId);
 
       return new Response(JSON.stringify({ success: true, fromMe: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
