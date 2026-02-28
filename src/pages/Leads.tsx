@@ -281,7 +281,11 @@ const Leads = () => {
       query = buildQueryFilters(query);
 
       // Apply ordering
-      if (sortOrder === "alphabetical") {
+      if (sortOrder === "score") {
+        query = query
+          .order("score", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false });
+      } else if (sortOrder === "alphabetical") {
         query = query.order("name", { ascending: true, nullsFirst: false });
       } else {
         query = query
@@ -888,6 +892,7 @@ const Leads = () => {
               <SelectContent>
                 <SelectItem value="recent">Mais recentes</SelectItem>
                 <SelectItem value="alphabetical">Ordem alfabética</SelectItem>
+                <SelectItem value="score">Maior score</SelectItem>
               </SelectContent>
             </Select>
           </div>

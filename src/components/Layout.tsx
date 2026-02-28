@@ -191,9 +191,9 @@ const Layout = ({ children }: LayoutProps) => {
                   : '100%' // Desktop relative
             }}
           >
-            <div className="flex flex-col h-full min-h-max relative z-10">
+            <div className="flex flex-col h-full min-h-0 relative z-10">
               <div className={cn(
-                "flex flex-col flex-1 transition-transform duration-300 origin-top",
+                "flex flex-col flex-1 min-h-0 transition-transform duration-300 origin-top",
                 !sidebarCollapsed && "scale-[0.95]"
               )}>
                 <div className={cn("p-4", sidebarCollapsed ? "lg:px-3 lg:py-5" : "p-6")}>
@@ -248,7 +248,7 @@ const Layout = ({ children }: LayoutProps) => {
                 )}
 
                 <nav className={cn(
-                  "space-y-1 flex-1",
+                  "space-y-1 flex-1 min-h-0 overflow-y-auto",
                   sidebarCollapsed ? "lg:px-3" : "px-3",
                   "px-3"
                 )}>
@@ -303,97 +303,95 @@ const Layout = ({ children }: LayoutProps) => {
 
                   {/* Tools Navigation: Conexões WhatsApp */}
                   {toolsNav.map(renderNavItem)}
-                </nav>
-
-                {/* Bottom section of top group - using mt-auto */}
-                <div className={cn("mt-auto", isMobile ? "pb-4" : "pb-4")}>
 
                   {/* Separator: SUPORTE E AJUSTES */}
-                  <div className={cn("pb-2", sidebarCollapsed && "lg:hidden", "px-3")}>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Suporte e Ajustes
-                    </span>
-                  </div>
-                  {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-3 mb-2" />}
+                  {!sidebarCollapsed && (
+                    <div className="pt-4 pb-1 px-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Suporte e Ajustes
+                      </span>
+                    </div>
+                  )}
+                  {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
 
-                  {/* Suporte, Indicações, Configurações */}
-                  <div className={cn(sidebarCollapsed ? "lg:px-3" : "px-3", "px-3 space-y-1 mb-4")}>
-                    {/* Support Button */}
-                    {sidebarCollapsed ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => {
-                              setSidebarOpen(false);
-                              setSupportChatOpen(!supportChatOpen);
-                            }}
-                            className={cn(
-                              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
-                              "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                              "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                            )}
-                          >
-                            <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                            <span className="lg:hidden">Suporte</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setSidebarOpen(false);
-                          setSupportChatOpen(!supportChatOpen);
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
-                          "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                        )}
-                      >
-                        <MdSupportAgent className="h-5 w-5 shrink-0" />
-                        <span>Suporte</span>
-                      </button>
-                    )}
+                  {/* Support Button */}
+                  {sidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => {
+                            setSidebarOpen(false);
+                            setSupportChatOpen(!supportChatOpen);
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
+                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                            "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                          )}
+                        >
+                          <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                          <span className="lg:hidden">Suporte</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSidebarOpen(false);
+                        setSupportChatOpen(!supportChatOpen);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                        "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                      )}
+                    >
+                      <MdSupportAgent className="h-5 w-5 shrink-0" />
+                      <span>Suporte</span>
+                    </button>
+                  )}
 
-                    {/* Indicações Link */}
-                    {sidebarCollapsed ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Link
-                            to="/indicacao"
-                            className={cn(
-                              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
-                              "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                              location.pathname === "/indicacao"
-                                ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                                : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                            )}
-                          >
-                            <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                            <span className="lg:hidden">Indicações</span>
-                          </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Link
-                        to="/indicacao"
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                          location.pathname === "/indicacao"
-                            ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                            : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                        )}
-                      >
-                        <HiOutlineGift className="h-5 w-5 shrink-0" />
-                        <span>Indicações</span>
-                      </Link>
-                    )}
+                  {/* Indicações Link */}
+                  {sidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to="/indicacao"
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
+                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                            location.pathname === "/indicacao"
+                              ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                              : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                          )}
+                        >
+                          <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                          <span className="lg:hidden">Indicações</span>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Link
+                      to="/indicacao"
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                        location.pathname === "/indicacao"
+                          ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                          : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                      )}
+                    >
+                      <HiOutlineGift className="h-5 w-5 shrink-0" />
+                      <span>Indicações</span>
+                    </Link>
+                  )}
 
-                    {/* Configurações */}
-                    {systemNav.map(renderNavItem)}
-                  </div>
-                </div> {/* End of TOP Scaled Group */}
+                  {/* Configurações */}
+                  {systemNav.map(renderNavItem)}
+
+                  {/* Bottom spacer inside nav */}
+                  <div className="pb-2" />
+                </nav>
 
                 {/* BOTTOM SCALED GROUP: Container inferior (PlanBadge + Botão Sair) */}
                 <div className={cn(

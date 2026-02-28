@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Phone, Mail, Calendar, Users, Star } from "lucide-react";
+import { Phone, Mail, Calendar, Users, Star, Flame, Thermometer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPhoneDisplay, detectPhoneCountry } from "@/lib/phone";
 import { AIToggle } from "./AIToggle";
@@ -83,6 +83,13 @@ const STATUS_CONFIG = {
   },
 };
 
+const getScoreConfig = (score: number) => {
+  if (score >= 80) return { label: "Quente", emoji: "🔥", color: "text-emerald-500", bg: "bg-emerald-500", bgLight: "bg-emerald-500/15" };
+  if (score >= 50) return { label: "Morno", emoji: "☀️", color: "text-amber-500", bg: "bg-amber-500", bgLight: "bg-amber-500/15" };
+  if (score >= 25) return { label: "Frio", emoji: "🌤️", color: "text-orange-500", bg: "bg-orange-500", bgLight: "bg-orange-500/15" };
+  return { label: "Gelado", emoji: "❄️", color: "text-red-400", bg: "bg-red-400", bgLight: "bg-red-400/15" };
+};
+
 export const LeadsTable = ({
   leads,
   isSelectionMode,
@@ -130,10 +137,10 @@ export const LeadsTable = ({
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider w-32 xl:w-40">
               Progresso
             </TableHead>
-            <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">
               Status
             </TableHead>
-            <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center w-20">
+            <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center w-24">
               Score
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">
@@ -318,7 +325,7 @@ const LeadTableRow = ({
       </TableCell>
 
       {/* Status */}
-      <TableCell className="py-4">
+      <TableCell className="py-4 text-center">
         <Badge
           variant="secondary"
           className={cn(
@@ -332,22 +339,28 @@ const LeadTableRow = ({
       </TableCell>
 
       {/* Score */}
-      <TableCell className="text-center py-4">
-        {lead.score !== null && lead.score !== undefined ? (
-          <span
-            className={cn(
-              "font-medium",
-              lead.score >= 70
-                ? "text-emerald-500"
-                : lead.score >= 40
-                  ? "text-amber-500"
-                  : "text-red-500",
-            )}
-          >
-            {lead.score}%
-          </span>
+      <TableCell className="py-4">
+        {lead.score != null && lead.score > 0 ? (
+          (() => {
+            const config = getScoreConfig(lead.score);
+            return (
+              <div className="flex flex-col gap-1.5 min-w-[70px]">
+                <div className="flex items-center justify-between">
+                  <span className={cn("text-xs font-bold", config.color)}>{lead.score}</span>
+                  <span className="text-[10px]">{config.emoji}</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all", config.bg)}
+                    style={{ width: `${lead.score}%` }}
+                  />
+                </div>
+                <span className={cn("text-[9px] font-medium uppercase tracking-wider", config.color)}>{config.label}</span>
+              </div>
+            );
+          })()
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground text-xs">—</span>
         )}
       </TableCell>
 

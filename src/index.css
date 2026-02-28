@@ -361,11 +361,11 @@ All colors MUST be HSL.
   /* Global thin scrollbar for all scrollable containers */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.15) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.05) transparent;
   }
 
   *:hover {
-    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.17) transparent;
   }
 
   /* Webkit (Chrome, Safari, Edge) */
@@ -379,18 +379,18 @@ All colors MUST be HSL.
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.15);
+    background-color: hsl(var(--muted-foreground) / 0.10);
     border-radius: 999px;
     border: 1px solid transparent;
     transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.35);
+    background-color: hsl(var(--muted-foreground) / 0.20);
   }
 
   ::-webkit-scrollbar-thumb:active {
-    background-color: hsl(var(--muted-foreground) / 0.5);
+    background-color: hsl(var(--muted-foreground) / 0.30);
   }
 
   ::-webkit-scrollbar-corner {
@@ -669,13 +669,17 @@ All colors MUST be HSL.
 .antigravity .whatsapp-doodle-bg {
   background-color: hsl(var(--background));
   background-image:
+    radial-gradient(ellipse at center,
+      transparent 40%,
+      hsl(var(--background) / 0.6) 80%,
+      hsl(var(--background) / 0.95) 100%),
     linear-gradient(to bottom,
       hsl(var(--background) / 0.2),
       hsl(var(--background) / 0.2)),
     url('/images/whatsapp-doodle-dark.png');
-  background-size: cover, 582px 582px;
-  background-repeat: no-repeat, repeat;
-  background-position: center, center;
+  background-size: cover, cover, 582px 582px;
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-position: center, center, center;
 }
 
 /* ===== AI Chat Sidebar Animations ===== */

@@ -148,10 +148,8 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
     }
   };
 
-  const calculateDrop = (currentValue: number, previousValue: number) => {
-    if (previousValue === 0) return 0;
-    return Math.round((currentValue / previousValue) * 100);
-  };
+
+
 
   return (
     <Card className={cn("flex flex-col border-border/30 shadow-xl overflow-hidden relative min-h-[400px] w-full bg-card font-sans", className)}>

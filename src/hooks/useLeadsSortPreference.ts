@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type LeadsSortOrder = "recent" | "alphabetical";
+export type LeadsSortOrder = "recent" | "alphabetical" | "score";
 
 export const useLeadsSortPreference = () => {
   const { profile } = useAuth();
@@ -12,7 +12,7 @@ export const useLeadsSortPreference = () => {
     queryKey: ["leads_sort_preference", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return "recent" as LeadsSortOrder;
-      
+
       const { data, error } = await supabase
         .from("system_config")
         .select("config_value")

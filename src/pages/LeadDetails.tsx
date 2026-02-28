@@ -47,7 +47,7 @@ import { toast } from "sonner";
 import { useTerminology } from "@/hooks/useTerminology";
 import { LeadQuotesTab } from "@/components/quotes/LeadQuotesTab";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
-import { SentimentSection } from "@/components/leads/SentimentSection";
+
 import { AIToggle } from "@/components/leads/AIToggle";
 import { EmojiPickerPopover } from "@/components/conversations/EmojiPickerPopover";
 import { formatPhoneDisplay, detectPhoneCountry } from "@/lib/phone";

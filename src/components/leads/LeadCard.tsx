@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Phone, Mail, Calendar, ChevronRight, Users, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPhoneDisplay, detectPhoneCountry } from "@/lib/phone";
-import { SentimentIndicator } from "./SentimentIndicator";
+
 import { AIToggle } from "./AIToggle";
 
 interface LeadCardProps {
@@ -18,7 +18,7 @@ interface LeadCardProps {
     status: string | null;
     created_at: string | null;
     metadata: any;
-    sentiment_score?: number | null;
+    score?: number | null;
     ai_enabled?: boolean | null;
     is_favorite?: boolean | null;
     avatar_url?: string | null;
@@ -175,9 +175,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
                 )}
                 {/* Badges row */}
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  {lead.sentiment_score !== null && lead.sentiment_score !== undefined && (
-                    <SentimentIndicator score={lead.sentiment_score} size="sm" />
-                  )}
+
                   <Badge
                     variant="secondary"
                     className={cn(
@@ -190,6 +188,20 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
                     <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", statusConfig.dot)} />
                     {statusConfig.label}
                   </Badge>
+                  {lead.score != null && lead.score > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "shrink-0 font-bold text-[10px] px-2 py-0.5 border-0",
+                        lead.score >= 80 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
+                          lead.score >= 50 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                            lead.score >= 25 ? "bg-orange-500/15 text-orange-600 dark:text-orange-400" :
+                              "bg-red-500/15 text-red-500 dark:text-red-400"
+                      )}
+                    >
+                      🎯 {lead.score}
+                    </Badge>
+                  )}
                 </div>
               </div>
 
