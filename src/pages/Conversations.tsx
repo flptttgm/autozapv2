@@ -249,7 +249,7 @@ const MemoizedSidebarContent = memo(function SidebarContent({
     if (!lastMessage) return "";
 
     let prefix = "";
-    if (lastMessage.direction === "outbound") {
+    if (lastMessage.direction === "outbound" || lastMessage.direction === "outbound_manual") {
       if (lastMessage.isAI) {
         prefix = "🤖 ";
       } else {
@@ -406,7 +406,7 @@ const MemoizedSidebarContent = memo(function SidebarContent({
                           }`}
                         title={rawPreview}
                       >
-                        {lastMessage?.direction === "outbound" && !lastMessage?.isAI && (
+                        {(lastMessage?.direction === "outbound" || lastMessage?.direction === "outbound_manual") && !lastMessage?.isAI && (
                           (lastMessage.deliveryStatus === 'read' || lastMessage.deliveryStatus === 'played')
                             ? <CheckCheck className="h-4 w-4 shrink-0 text-blue-500" />
                             : (lastMessage.deliveryStatus === 'received')
@@ -419,7 +419,7 @@ const MemoizedSidebarContent = memo(function SidebarContent({
                         <span className="truncate">
                           <AppleEmojiText
                             text={formatPreviewForList(
-                              lastMessage?.direction === "outbound"
+                              (lastMessage?.direction === "outbound" || lastMessage?.direction === "outbound_manual")
                                 ? getMessagePreviewText(lastMessage, isGroup).replace(/^(🤖 |✓✓ |✓ )/, '')
                                 : rawPreview
                             )}
