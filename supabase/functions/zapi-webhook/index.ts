@@ -32,6 +32,11 @@ serve(async (req: Request) => {
     );
     await supabaseDebug.from('debug_logs').insert({ data: payload });
 
+    // Skip status@broadcast messages (WhatsApp status updates — not real conversations)
+    if (payload.phone?.includes('broadcast') || payload.chatId?.includes('broadcast')) {
+      return new Response(JSON.stringify({ ignored: true, reason: 'broadcast' }), { headers: corsHeaders });
+    }
+
     // Only process ReceivedCallback (User Messages)
     if (payload.type === 'ReceivedCallback' && !payload.fromMe) {
       const supabase = createClient(
