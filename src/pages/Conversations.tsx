@@ -1962,6 +1962,7 @@ const Conversations = () => {
     queryFn: async () => {
       if (!selectedChatId || !profile?.workspace_id) return [];
 
+      // First try by chat_id
       const { data, error } = await supabase
         .from("messages")
         .select("*")
@@ -1970,6 +1971,20 @@ const Conversations = () => {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
+
+      // If no messages found by chat_id, try by lead_id (selectedChatId might be a lead_id due to grouping)
+      if ((!data || data.length === 0) && selectedChatId.includes("-")) {
+        const { data: leadMessages, error: leadError } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("lead_id", selectedChatId)
+          .eq("workspace_id", profile.workspace_id)
+          .order("created_at", { ascending: true });
+
+        if (leadError) throw leadError;
+        return leadMessages;
+      }
+
       return data;
     },
     enabled: !!selectedChatId && !!profile?.workspace_id,
