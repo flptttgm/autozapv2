@@ -48,19 +48,19 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
     queryKey: ["unread-by-instance", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, byInstance: {} };
-      
+
       const { data, error } = await supabase
         .from("messages")
         .select("metadata")
         .eq("workspace_id", profile.workspace_id)
         .eq("direction", "inbound")
         .eq("is_read", false);
-      
+
       if (error) throw error;
-      
+
       const byInstance: Record<string, number> = {};
       let total = 0;
-      
+
       data?.forEach((msg) => {
         const instanceId = (msg.metadata as any)?.instanceId;
         total++;
@@ -68,7 +68,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
           byInstance[instanceId] = (byInstance[instanceId] || 0) + 1;
         }
       });
-      
+
       return { total, byInstance };
     },
     enabled: !!profile?.workspace_id,
@@ -195,7 +195,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
           )}
         </button>
       </CollapsibleTrigger>
-      
+
       <CollapsibleContent className="pl-4 mt-1 space-y-1">
         {/* All conversations */}
         <Link
@@ -217,7 +217,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
         {instances?.map((instance) => {
           const instanceUnread = unreadByInstance[instance.instance_id] || 0;
           const isSelected = selectedInstance === instance.instance_id;
-          
+
           return (
             <Link
               key={instance.instance_id}

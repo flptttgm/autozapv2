@@ -30,12 +30,12 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { 
-  Loader2, 
-  Plus, 
-  Trash2, 
-  CalendarIcon, 
-  Check, 
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  CalendarIcon,
+  Check,
   ChevronsUpDown,
   Send
 } from "lucide-react";
@@ -55,7 +55,7 @@ interface CreateQuoteDialogProps {
 export function CreateQuoteDialog({ open, onOpenChange }: CreateQuoteDialogProps) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  
+
   const [leadId, setLeadId] = useState<string>("");
   const [leadOpen, setLeadOpen] = useState(false);
   const [items, setItems] = useState<QuoteItem[]>([{ name: "", value: "" }]);
@@ -98,7 +98,7 @@ export function CreateQuoteDialog({ open, onOpenChange }: CreateQuoteDialogProps
       // Create chat_id from lead phone
       const lead = leads?.find(l => l.id === leadId);
       if (!lead) throw new Error("Lead não encontrado");
-      
+
       const phone = lead.phone.replace(/\D/g, '');
       const chatId = `${phone}@c.us`;
 
@@ -123,18 +123,27 @@ export function CreateQuoteDialog({ open, onOpenChange }: CreateQuoteDialogProps
       // Update lead score +10 for quote created
       const { data: currentLead } = await supabase
         .from("leads")
-        .select("score")
+        .select("score, metadata")
         .eq("id", leadId)
         .single();
-      
+
       const currentScore = currentLead?.score || 0;
       let newScore = Math.max(0, currentScore + 10);
-      
+
+      // Track score history for timeline milestones
+      const currentMetadata = (currentLead?.metadata as any) || {};
+      const scoreHistory = currentMetadata.score_history || [];
+      scoreHistory.push({ score: newScore, date: new Date().toISOString() });
+
       await supabase
         .from("leads")
-        .update({ score: newScore, updated_at: new Date().toISOString() })
+        .update({
+          score: newScore,
+          metadata: { ...currentMetadata, score_history: scoreHistory },
+          updated_at: new Date().toISOString()
+        })
         .eq("id", leadId);
-      
+
       console.log(`[CreateQuoteDialog] Lead score updated: +10 for quote_created (${currentScore} → ${newScore})`);
 
       // Send via WhatsApp if requested (also adds +5 to score via edge function)
@@ -376,7 +385,7 @@ export function CreateQuoteDialog({ open, onOpenChange }: CreateQuoteDialogProps
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={createQuoteMutation.isPending || !leadId}
           >

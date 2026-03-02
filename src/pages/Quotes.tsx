@@ -106,16 +106,25 @@ const Quotes = () => {
       if (scoreChange !== 0) {
         const { data: lead } = await supabase
           .from("leads")
-          .select("score")
+          .select("score, metadata")
           .eq("id", leadId)
           .single();
 
         const currentScore = lead?.score || 0;
         const newScore = Math.max(0, currentScore + scoreChange);
 
+        // Track score history for timeline milestones
+        const currentMetadata = (lead?.metadata as any) || {};
+        const scoreHistory = currentMetadata.score_history || [];
+        scoreHistory.push({ score: newScore, date: new Date().toISOString() });
+
         await supabase
           .from("leads")
-          .update({ score: newScore, updated_at: new Date().toISOString() })
+          .update({
+            score: newScore,
+            metadata: { ...currentMetadata, score_history: scoreHistory },
+            updated_at: new Date().toISOString()
+          })
           .eq("id", leadId);
 
         console.log(

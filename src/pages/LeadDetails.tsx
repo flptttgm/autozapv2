@@ -158,9 +158,32 @@ const LeadDetails = () => {
   // Update lead status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
+      // First fetch current lead to get metadata and old status
+      const { data: currentLead } = await supabase
+        .from("leads")
+        .select("status, metadata")
+        .eq("id", id)
+        .single();
+
+      const currentMetadata = (currentLead?.metadata as any) || {};
+      const statusHistory = currentMetadata.status_history || [];
+
+      // Append status change to history
+      if (currentLead?.status && currentLead.status !== newStatus) {
+        statusHistory.push({
+          from: currentLead.status,
+          to: newStatus,
+          date: new Date().toISOString()
+        });
+      }
+
       const { error } = await supabase
         .from("leads")
-        .update({ status: newStatus as any })
+        .update({
+          status: newStatus as any,
+          metadata: { ...currentMetadata, status_history: statusHistory },
+          updated_at: new Date().toISOString()
+        })
         .eq("id", id);
       if (error) throw error;
     },

@@ -177,7 +177,7 @@ const Layout = ({ children }: LayoutProps) => {
               // Height: fixed on mobile/tablet (max-h restricted), full height on desktop flex
               "h-screen lg:h-full",
               // Desktop: collapsible width
-              sidebarCollapsed ? "lg:w-20" : "lg:w-64",
+              sidebarCollapsed ? "lg:w-[82px]" : "lg:w-64",
               "w-64",
               "sidebar-pattern-bg"
             )}

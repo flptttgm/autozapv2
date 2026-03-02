@@ -21,10 +21,20 @@ import {
   CheckCircle2,
   XCircle,
   CalendarCheck,
+  CalendarX2,
   Receipt,
   CircleDollarSign,
   UserPlus,
-  Clock
+  Clock,
+  Bot,
+  Smartphone,
+  TrendingUp,
+  ArrowRightLeft,
+  AlertTriangle,
+  UserCheck,
+  AtSign,
+  Tag,
+  ShieldAlert
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,7 +49,7 @@ interface TimelineEvent {
   value?: number | null;
   date: string;
   icon: string;
-  color: 'yellow' | 'green' | 'red' | 'blue' | 'orange' | 'purple' | 'gray';
+  color: 'yellow' | 'green' | 'red' | 'blue' | 'orange' | 'purple' | 'gray' | 'cyan' | 'teal' | 'indigo';
 }
 
 interface ContactDetailsPanelProps {
@@ -86,7 +96,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
     enabled: !!lead?.id,
   });
 
-  // Fetch timeline events (quotes, appointments, invoices)
+  // Fetch timeline events (quotes, appointments, invoices, messages, tags, etc.)
   const { data: timelineEvents = [] } = useQuery({
     queryKey: ["lead-timeline", lead?.id],
     queryFn: async (): Promise<TimelineEvent[]> => {
@@ -139,7 +149,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
         }
       });
 
-      // Fetch appointments
+      // Fetch appointments (including cancelled)
       const { data: appointments } = await supabase
         .from("appointments")
         .select("id, title, status, start_time, created_at")
@@ -147,21 +157,33 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
         .order("created_at", { ascending: false });
 
       appointments?.forEach(apt => {
-        events.push({
-          id: `apt-${apt.id}`,
-          type: apt.status === 'completed' ? 'appointment_completed' : 'appointment_created',
-          title: apt.status === 'completed' ? 'Agendamento concluído' : 'Agendamento marcado',
-          description: apt.title,
-          date: apt.created_at,
-          icon: apt.status === 'completed' ? 'CalendarCheck' : 'Calendar',
-          color: apt.status === 'completed' ? 'green' : 'blue'
-        });
+        if (apt.status === 'cancelled') {
+          events.push({
+            id: `apt-cancelled-${apt.id}`,
+            type: 'appointment_cancelled',
+            title: 'Agendamento cancelado',
+            description: apt.title,
+            date: apt.created_at,
+            icon: 'CalendarX2',
+            color: 'red'
+          });
+        } else {
+          events.push({
+            id: `apt-${apt.id}`,
+            type: apt.status === 'completed' ? 'appointment_completed' : 'appointment_created',
+            title: apt.status === 'completed' ? 'Agendamento concluído' : 'Agendamento marcado',
+            description: apt.title,
+            date: apt.created_at,
+            icon: apt.status === 'completed' ? 'CalendarCheck' : 'Calendar',
+            color: apt.status === 'completed' ? 'green' : 'blue'
+          });
+        }
       });
 
       // Fetch invoices
       const { data: invoices } = await supabase
         .from("invoices")
-        .select("id, amount, status, sent_at, paid_at, created_at")
+        .select("id, amount, status, sent_at, paid_at, created_at, due_date")
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
 
@@ -189,7 +211,109 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
             color: 'green'
           });
         }
+
+        // 8. Overdue invoice
+        const dueDate = (invoice as any).due_date;
+        if (dueDate && !invoice.paid_at && new Date(dueDate) < new Date()) {
+          events.push({
+            id: `invoice-overdue-${invoice.id}`,
+            type: 'invoice_overdue',
+            title: 'Cobrança vencida',
+            description: 'Pagamento em atraso',
+            value: invoice.amount,
+            date: dueDate,
+            icon: 'AlertTriangle',
+            color: 'red'
+          });
+        }
       });
+
+      // 3. First AI response
+      const { data: firstAiMsg } = await supabase
+        .from("messages")
+        .select("id, created_at")
+        .eq("lead_id", lead.id)
+        .eq("direction", "outbound")
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (firstAiMsg?.[0]) {
+        events.push({
+          id: 'first-ai-response',
+          type: 'first_ai_response',
+          title: 'Primeira resposta da IA',
+          description: 'Agente IA iniciou atendimento',
+          date: firstAiMsg[0].created_at,
+          icon: 'Bot',
+          color: 'cyan'
+        });
+      }
+
+      // 4. First manual WhatsApp message (outbound_manual)
+      const { data: firstManualMsg } = await supabase
+        .from("messages")
+        .select("id, created_at")
+        .eq("lead_id", lead.id)
+        .eq("direction", "outbound_manual")
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (firstManualMsg?.[0]) {
+        events.push({
+          id: 'first-manual-msg',
+          type: 'first_manual_message',
+          title: 'Atendimento humano',
+          description: 'Mensagem enviada diretamente pelo WhatsApp',
+          date: firstManualMsg[0].created_at,
+          icon: 'Smartphone',
+          color: 'teal'
+        });
+      }
+
+      // 2. Tags added
+      const { data: tagAssignments } = await supabase
+        .from("lead_tags" as any)
+        .select("tag_id, created_at, tags(name, color)" as any)
+        .eq("lead_id", lead.id)
+        .order("created_at", { ascending: false });
+
+      (tagAssignments as any)?.forEach((assignment: any) => {
+        const tagName = assignment.tags?.name || 'Tag';
+        events.push({
+          id: `tag-${assignment.tag_id}`,
+          type: 'tag_added',
+          title: 'Tag adicionada',
+          description: tagName,
+          date: assignment.created_at,
+          icon: 'Tag',
+          color: 'indigo'
+        });
+      });
+
+      // 6. Agent transfer / AI pause from chat_memory
+      const { data: chatMemory } = await supabase
+        .from("chat_memory")
+        .select("ai_paused, pause_reason, paused_at, current_agent_id, custom_templates(name)")
+        .eq("lead_id", lead.id)
+        .limit(1)
+        .single();
+
+      if (chatMemory?.ai_paused && chatMemory?.paused_at) {
+        const reasonMap: Record<string, string> = {
+          'manual_takeover': 'Atendente assumiu a conversa',
+          'human_requested': 'Cliente solicitou atendente humano',
+          'error': 'Pausa por erro no processamento',
+        };
+        events.push({
+          id: 'ai-paused',
+          type: 'agent_transfer',
+          title: 'IA pausada',
+          description: reasonMap[chatMemory.pause_reason || ''] || chatMemory.pause_reason || 'Transferência para atendente',
+          date: chatMemory.paused_at,
+          icon: 'ArrowRightLeft',
+          color: 'orange'
+        });
+      }
 
       // Add lead creation event
       if (lead.created_at) {
@@ -217,6 +341,73 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
           color: 'purple'
         });
       });
+
+      // 1. Status changes from metadata.status_history
+      const statusHistory = (lead.metadata?.status_history || []) as { from: string; to: string; date: string }[];
+      const statusLabels: Record<string, string> = {
+        new: 'Novo', contacted: 'Contatado', qualified: 'Qualificado',
+        proposal: 'Proposta', negotiation: 'Negociação', won: 'Ganho', lost: 'Perdido'
+      };
+      statusHistory.forEach((change, index) => {
+        events.push({
+          id: `status-change-${index}`,
+          type: 'status_changed',
+          title: 'Status alterado',
+          description: `${statusLabels[change.from] || change.from} → ${statusLabels[change.to] || change.to}`,
+          date: change.date,
+          icon: 'ShieldAlert',
+          color: change.to === 'lost' ? 'red' : change.to === 'won' ? 'green' : 'blue'
+        });
+      });
+
+      // 5. Score milestones from metadata.score_history
+      const scoreHistory = (lead.metadata?.score_history || []) as { score: number; date: string }[];
+      const milestones = [25, 50, 75, 100];
+      const passedMilestones = new Set<number>();
+      scoreHistory.forEach((entry) => {
+        milestones.forEach(milestone => {
+          if (entry.score >= milestone && !passedMilestones.has(milestone)) {
+            passedMilestones.add(milestone);
+            events.push({
+              id: `score-milestone-${milestone}`,
+              type: 'score_milestone',
+              title: `Score atingiu ${milestone}%`,
+              description: `Engajamento em alta — score passou de ${milestone}%`,
+              date: entry.date,
+              icon: 'TrendingUp',
+              color: milestone >= 75 ? 'green' : milestone >= 50 ? 'blue' : 'yellow'
+            });
+          }
+        });
+      });
+
+      // 9. Name identified
+      const nameHistory = lead.metadata?.name_identified_at as string | undefined;
+      if (nameHistory && lead.name) {
+        events.push({
+          id: 'name-identified',
+          type: 'name_identified',
+          title: 'Nome identificado',
+          description: `Contato identificado como "${lead.name}"`,
+          date: nameHistory,
+          icon: 'UserCheck',
+          color: 'teal'
+        });
+      }
+
+      // 10. Email captured  
+      const emailCapturedAt = lead.metadata?.email_captured_at as string | undefined;
+      if (emailCapturedAt && lead.email) {
+        events.push({
+          id: 'email-captured',
+          type: 'email_captured',
+          title: 'Email capturado',
+          description: lead.email,
+          date: emailCapturedAt,
+          icon: 'AtSign',
+          color: 'indigo'
+        });
+      }
 
       // Sort by date descending
       return events.sort((a, b) =>
@@ -282,10 +473,20 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
       XCircle: <XCircle className="h-3.5 w-3.5" />,
       Calendar: <Calendar className="h-3.5 w-3.5" />,
       CalendarCheck: <CalendarCheck className="h-3.5 w-3.5" />,
+      CalendarX2: <CalendarX2 className="h-3.5 w-3.5" />,
       Receipt: <Receipt className="h-3.5 w-3.5" />,
       CircleDollarSign: <CircleDollarSign className="h-3.5 w-3.5" />,
       UserPlus: <UserPlus className="h-3.5 w-3.5" />,
       MessageSquare: <MessageSquare className="h-3.5 w-3.5" />,
+      Bot: <Bot className="h-3.5 w-3.5" />,
+      Smartphone: <Smartphone className="h-3.5 w-3.5" />,
+      TrendingUp: <TrendingUp className="h-3.5 w-3.5" />,
+      ArrowRightLeft: <ArrowRightLeft className="h-3.5 w-3.5" />,
+      AlertTriangle: <AlertTriangle className="h-3.5 w-3.5" />,
+      UserCheck: <UserCheck className="h-3.5 w-3.5" />,
+      AtSign: <AtSign className="h-3.5 w-3.5" />,
+      Tag: <Tag className="h-3.5 w-3.5" />,
+      ShieldAlert: <ShieldAlert className="h-3.5 w-3.5" />,
     };
     return icons[iconName] || <Clock className="h-3.5 w-3.5" />;
   };
@@ -299,6 +500,9 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
       orange: 'bg-orange-500 text-orange-50',
       purple: 'bg-purple-500 text-purple-50',
       gray: 'bg-gray-500 text-gray-50',
+      cyan: 'bg-cyan-500 text-cyan-50',
+      teal: 'bg-teal-500 text-teal-50',
+      indigo: 'bg-indigo-500 text-indigo-50',
     };
     return colors[color] || colors.gray;
   };
@@ -520,7 +724,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
                 <div className="absolute left-[19px] top-6 bottom-4 w-px bg-gradient-to-b from-border via-border to-transparent" />
 
                 <div className="space-y-5">
-                  {timelineEvents.slice(0, 10).map((event) => (
+                  {timelineEvents.slice(0, 20).map((event) => (
                     <div key={event.id} className="relative flex gap-4 group/timeline">
                       {/* Icon circle */}
                       <div className={cn(
@@ -553,9 +757,9 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
                   ))}
                 </div>
 
-                {timelineEvents.length > 10 && (
+                {timelineEvents.length > 20 && (
                   <p className="text-xs text-muted-foreground text-center mt-3">
-                    +{timelineEvents.length - 10} eventos anteriores
+                    +{timelineEvents.length - 20} eventos anteriores
                   </p>
                 )}
               </div>

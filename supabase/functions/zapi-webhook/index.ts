@@ -37,6 +37,12 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ ignored: true, reason: 'broadcast' }), { headers: corsHeaders });
     }
 
+    // Skip waitingMessage notifications ("waiting for this message", view-once placeholders)
+    if (payload.waitingMessage) {
+      console.log('[zapi-webhook] Skipping waitingMessage');
+      return new Response(JSON.stringify({ ignored: true, reason: 'waiting_message' }), { headers: corsHeaders });
+    }
+
     // Only process ReceivedCallback (User Messages)
     if (payload.type === 'ReceivedCallback' && !payload.fromMe) {
       const supabase = createClient(
@@ -190,7 +196,8 @@ serve(async (req: Request) => {
           console.log(`[zapi-webhook] Successfully resolved @lid ${phone} to real phone ${lidMatch.chat_id}`);
           phone = lidMatch.chat_id;
         } else {
-          console.log(`[zapi-webhook] Could not resolve @lid ${phone}, proceeding with @lid`);
+          console.log(`[zapi-webhook] Could not resolve @lid ${phone}, skipping message to avoid ghost contact`);
+          return new Response(JSON.stringify({ ignored: true, reason: 'unresolvable_lid' }), { headers: corsHeaders });
         }
       }
 
@@ -244,12 +251,14 @@ serve(async (req: Request) => {
         leadError = null;
       } else {
         // Create new lead
+        const hasRealName = leadName !== 'Novo Cliente' && leadName !== 'Grupo';
         const { data: newLead, error: newLeadError } = await supabase
           .from('leads')
           .insert({
             workspace_id: workspaceId,
             phone: phone,
             name: leadName,
+            metadata: hasRealName ? { name_identified_at: new Date().toISOString() } : {},
           })
           .select('id, name, avatar_url')
           .single();
@@ -350,7 +359,91 @@ serve(async (req: Request) => {
         }
       }
 
-      // 4. Trigger AI Process (with optional message buffer)
+      // 4. Anti-Loop Detection — Prevent infinite bot-to-bot conversations
+      const { data: recentMsgs } = await supabase
+        .from('messages')
+        .select('content, direction, created_at')
+        .eq('chat_id', phone)
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false })
+        .limit(8);
+
+      let shouldSkipAI = false;
+
+      if (recentMsgs && recentMsgs.length >= 4) {
+        const msgs = recentMsgs.reverse(); // oldest first
+
+        // Helper: check if a message is "short" (emoji-only, single word, < 10 chars)
+        const isShort = (text: string) => {
+          if (!text) return true;
+          const trimmed = text.trim();
+          // Pure emoji (including combined emoji)
+          const emojiOnly = /^[\p{Emoji}\s]+$/u.test(trimmed);
+          if (emojiOnly) return true;
+          // Very short text
+          if (trimmed.length < 10) return true;
+          return false;
+        };
+
+        // Helper: check if a message looks like a farewell
+        const isFarewell = (text: string) => {
+          if (!text) return false;
+          const lower = text.toLowerCase().trim();
+          const farewellPatterns = [
+            'até mais', 'ate mais', 'tchau', 'até logo', 'ate logo',
+            'até!', 'ate!', 'até', 'flw', 'falou', 'bye', 'valeu',
+            'obrigado!', 'obrigada!', 'abraço', 'abraços', 'adeus'
+          ];
+          return farewellPatterns.some(p => lower.includes(p));
+        };
+
+        // Check 1: Farewell loop — if both sides said goodbye, stop responding
+        const last6 = msgs.slice(-6);
+        const outboundFarewells = last6.filter(m =>
+          (m.direction === 'outbound') && isFarewell(m.content)
+        );
+        const inboundFarewells = last6.filter(m =>
+          m.direction === 'inbound' && isFarewell(m.content)
+        );
+        if (outboundFarewells.length > 0 && inboundFarewells.length > 0) {
+          shouldSkipAI = true;
+          console.log('[zapi-webhook] 🛑 Anti-Loop: Farewell detected from both sides, skipping AI');
+        }
+
+        // Check 2: Short message ping-pong — if last 4+ messages are all short, stop
+        if (!shouldSkipAI) {
+          const last4 = msgs.slice(-4);
+          const allShort = last4.every(m => isShort(m.content));
+          const hasAlternating = last4.some((m, i) =>
+            i > 0 && m.direction !== last4[i - 1].direction
+          );
+          if (allShort && hasAlternating) {
+            shouldSkipAI = true;
+            console.log('[zapi-webhook] 🛑 Anti-Loop: Short message ping-pong detected, skipping AI');
+          }
+        }
+
+        // Check 3: Rapid-fire — more than 6 messages in less than 3 minutes between same parties
+        if (!shouldSkipAI && recentMsgs.length >= 6) {
+          const newest = new Date(recentMsgs[0].created_at).getTime();
+          const sixthOldest = new Date(recentMsgs[5].created_at).getTime();
+          const spanMs = newest - sixthOldest;
+          const allShortRecent = recentMsgs.slice(0, 6).every(m => isShort(m.content));
+          if (spanMs < 3 * 60 * 1000 && allShortRecent) {
+            shouldSkipAI = true;
+            console.log('[zapi-webhook] 🛑 Anti-Loop: Rapid-fire short messages detected, skipping AI');
+          }
+        }
+      }
+
+      if (shouldSkipAI) {
+        await supabaseDebug.from('debug_logs').insert({ data: { step: 'anti_loop_skip', chat_id: phone } });
+        return new Response(JSON.stringify({ success: true, skipped: 'anti_loop' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 5. Trigger AI Process (with optional message buffer)
       const bufferSeconds = instance.message_buffer_seconds || 0;
 
       if (bufferSeconds > 0) {
