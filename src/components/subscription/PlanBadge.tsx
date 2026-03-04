@@ -1,5 +1,6 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Crown, Clock, Zap, Gem, ChevronRight, AlertTriangle } from "lucide-react";
+import { Crown, Clock, Zap, Gem, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +55,13 @@ const planConfig = {
 };
 
 export const PlanBadge = () => {
+  const [isDismissed, setIsDismissed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("plan_badge_dismissed") === "true";
+    }
+    return false;
+  });
+
   const {
     subscription,
     isLoading,
@@ -65,12 +73,23 @@ export const PlanBadge = () => {
     membersLimit
   } = useSubscription();
 
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent Link navigation
+    e.stopPropagation(); // Stop event bubbling
+    setIsDismissed(true);
+    sessionStorage.setItem("plan_badge_dismissed", "true");
+  };
+
   if (isLoading) {
     return (
       <div className="mx-3 mb-3">
         <Skeleton className="h-16 w-full rounded-lg" />
       </div>
     );
+  }
+
+  if (isDismissed) {
+    return null;
   }
 
   const planType = subscription?.plan_type || 'trial';
@@ -99,8 +118,8 @@ export const PlanBadge = () => {
         )} />
 
         <div className="relative z-10 flex flex-col gap-2.5">
-          {/* Header row: Icon, Label, Chevron */}
-          <div className="flex items-center justify-between">
+          {/* Header row: Icon, Label, Close Button */}
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <div className={cn(
                 "flex items-center justify-center w-6 h-6 rounded-md bg-background/50 backdrop-blur-sm border border-white/5",
@@ -123,12 +142,18 @@ export const PlanBadge = () => {
               </div>
             </div>
 
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+            <button
+              onClick={handleDismiss}
+              className="p-1 -m-1 rounded-sm text-muted-foreground/50 hover:text-foreground/80 hover:bg-white/10 transition-all z-20 cursor-pointer"
+              aria-label="Dispensar alerta de plano"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           {/* Progress / Status row */}
           {!showTrialExpired && (
-            <div className="flex flex-col gap-2 mt-0.5">
+            <div className="flex flex-col gap-2 mt-0.5 pointer-events-none">
               {/* Connections Usage */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
@@ -173,3 +198,4 @@ export const PlanBadge = () => {
     </Link>
   );
 };
+

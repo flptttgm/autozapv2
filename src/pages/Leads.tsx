@@ -14,6 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -42,6 +48,10 @@ import {
   Download,
   ArrowUpDown,
   Search,
+  Inbox,
+  MoreVertical,
+  Filter,
+  FolderInput,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -52,10 +62,12 @@ import {
 } from "@/hooks/useLeadsSortPreference";
 import { ImportLeadsDialog } from "@/components/leads/ImportLeadsDialog";
 import { LeadCard } from "@/components/leads/LeadCard";
+import { CreateLeadDialog } from "@/components/leads/CreateLeadDialog";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import { BroadcastMessageDialog } from "@/components/leads/BroadcastMessageDialog";
 import { FolderTabs, LeadFolder } from "@/components/leads/FolderTabs";
 import { CreateFolderDialog } from "@/components/leads/CreateFolderDialog";
+import { MoveToFolderDialog } from "@/components/leads/MoveToFolderDialog";
 import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 import {
   Pagination,
@@ -66,6 +78,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const leadSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100),
@@ -94,13 +107,27 @@ const Leads = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Folder filter state: null = "Todos", "general" = leads sem pasta, UUID = pasta específica
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('leads-selected-folder');
+    return saved ? saved : null;
+  });
+
+  const handleSelectFolder = (folderId: string | null) => {
+    setSelectedFolderId(folderId);
+    if (folderId) {
+      localStorage.setItem('leads-selected-folder', folderId);
+    } else {
+      localStorage.removeItem('leads-selected-folder');
+    }
+    setCurrentPage(1);
+  };
 
   // Selection mode states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBroadcastDialog, setShowBroadcastDialog] = useState(false);
+  const [showMoveToFolderDialog, setShowMoveToFolderDialog] = useState(false);
 
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -209,11 +236,11 @@ const Leads = () => {
       query = query.eq("whatsapp_instance_id", instanceFilter);
     }
 
-    // Folder filter
-    if (selectedFolderId === "general") {
-      query = query.is("folder_id", null);
+    // Folder filter: null means the default "Todos" (leads without folder)
+    if (selectedFolderId === null || selectedFolderId === "general") {
+      query = query.filter("folder_ids", "eq", "{}");
     } else if (selectedFolderId) {
-      query = query.eq("folder_id", selectedFolderId);
+      query = query.contains("folder_ids", [selectedFolderId]);
     }
 
     // Search filter - applied server-side for better performance
@@ -241,7 +268,7 @@ const Leads = () => {
       if (!profile?.workspace_id) return 0;
 
       let query = supabase
-        .from("leads")
+        .from("vw_leads_with_folders")
         .select("*", { count: "exact", head: true })
         .eq("workspace_id", profile.workspace_id);
 
@@ -273,7 +300,7 @@ const Leads = () => {
       const to = from + ITEMS_PER_PAGE - 1;
 
       let query = supabase
-        .from("leads")
+        .from("vw_leads_with_folders")
         .select("*")
         .eq("workspace_id", profile.workspace_id)
         .range(from, to);
@@ -306,8 +333,8 @@ const Leads = () => {
     queryFn: async () => {
       if (!profile?.workspace_id) return [];
       const { data, error } = await supabase
-        .from("leads")
-        .select("id, folder_id")
+        .from("vw_leads_with_folders")
+        .select("id, folder_ids")
         .eq("workspace_id", profile.workspace_id);
       if (error) throw error;
       return data || [];
@@ -317,7 +344,7 @@ const Leads = () => {
 
   const totalLeadsCount = allLeadsForCounts?.length || 0;
   const generalLeadsCount =
-    allLeadsForCounts?.filter((l) => !l.folder_id).length || 0;
+    allLeadsForCounts?.filter((l) => !l.folder_ids || l.folder_ids.length === 0).length || 0;
 
   // Server-side pagination - leads are already paginated and filtered
   const paginatedLeads = leads;
@@ -515,143 +542,37 @@ const Leads = () => {
             {terminology.plural}
           </h1>
 
-          {/* Mobile: Grid layout for action buttons */}
-          <div className="flex flex-col gap-3 w-full sm:hidden">
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                className="rounded-xl h-12"
-                onClick={toggleSelectionMode}
-              >
-                {isSelectionMode ? (
-                  <>
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Selecionar
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl h-12"
-                onClick={() => navigate("/leads/prospect")}
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Prospectar
-              </Button>
-            </div>
+          {/* Mobile: Header buttons with Dropdown */}
+          <div className="flex items-center gap-2 w-full sm:hidden">
             <Button
-              variant="outline"
-              className="w-full rounded-xl h-12"
-              onClick={() => setIsImportDialogOpen(true)}
+              className="flex-1 rounded-xl h-12 shadow-lg shadow-primary/20 font-bold transition-all hover:scale-[1.02]"
+              onClick={() => setIsDialogOpen(true)}
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Importar Lista
+              <Plus className="h-4 w-4 mr-2" />
+              {terminology.novo}
             </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full rounded-xl h-12 shadow-lg shadow-primary/20 font-bold">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {terminology.novo}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-xl h-12 w-12 border-border/50 shrink-0 bg-background/50 backdrop-blur-sm shadow-sm">
+                  <MoreVertical className="h-5 w-5 text-muted-foreground" />
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Criar {terminology.novo}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder={`Nome do ${terminology.singularLower}`}
-                    />
-                    {formErrors.name && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone *</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      placeholder="Ex: 11999999999"
-                    />
-                    {formErrors.phone && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.phone}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      placeholder="email@exemplo.com"
-                    />
-                    {formErrors.email && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.email}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(v: any) =>
-                        setFormData({ ...formData, status: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">Novo</SelectItem>
-                        <SelectItem value="contacted">Contatado</SelectItem>
-                        <SelectItem value="qualified">Qualificado</SelectItem>
-                        <SelectItem value="converted">Convertido</SelectItem>
-                        <SelectItem value="lost">Perdido</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
-                  <DialogClose asChild>
-                    <Button variant="outline" className="w-full sm:w-auto">
-                      Cancelar
-                    </Button>
-                  </DialogClose>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={createLeadMutation.isPending}
-                    className="w-full sm:w-auto"
-                  >
-                    {createLeadMutation.isPending
-                      ? "Criando..."
-                      : `Criar ${terminology.singular}`}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px] glass border-border/50 rounded-xl mt-1.5 p-1 animate-in zoom-in-95 data-[state=closed]:zoom-out-95 shadow-xl">
+                <DropdownMenuItem onClick={toggleSelectionMode} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
+                  {isSelectionMode ? <X className="h-4 w-4 text-muted-foreground mr-1" /> : <CheckSquare className="h-4 w-4 text-muted-foreground mr-1" />}
+                  {isSelectionMode ? "Cancelar Seleção" : "Em massa"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/leads/prospect")} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
+                  <Search className="h-4 w-4 text-muted-foreground mr-1" />
+                  Prospectar
+                </DropdownMenuItem>
+                <div className="h-[1px] bg-border/50 my-1 mx-2" />
+                <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
+                  <Upload className="h-4 w-4 text-muted-foreground mr-1" />
+                  Importar Lista
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Desktop: Horizontal inline buttons */}
@@ -683,106 +604,10 @@ const Leads = () => {
               <Upload className="h-4 w-4 mr-2" />
               Importar
             </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {terminology.novo}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Criar {terminology.novo}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name-desktop">Nome *</Label>
-                    <Input
-                      id="name-desktop"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      placeholder={`Nome do ${terminology.singularLower}`}
-                    />
-                    {formErrors.name && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone-desktop">Telefone *</Label>
-                    <Input
-                      id="phone-desktop"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      placeholder="Ex: 11999999999"
-                    />
-                    {formErrors.phone && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.phone}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-desktop">Email</Label>
-                    <Input
-                      id="email-desktop"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      placeholder="email@exemplo.com"
-                    />
-                    {formErrors.email && (
-                      <p className="text-sm text-destructive">
-                        {formErrors.email}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status-desktop">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(v: any) =>
-                        setFormData({ ...formData, status: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">Novo</SelectItem>
-                        <SelectItem value="contacted">Contatado</SelectItem>
-                        <SelectItem value="qualified">Qualificado</SelectItem>
-                        <SelectItem value="converted">Convertido</SelectItem>
-                        <SelectItem value="lost">Perdido</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
-                  <DialogClose asChild>
-                    <Button variant="outline" className="w-full sm:w-auto">
-                      Cancelar
-                    </Button>
-                  </DialogClose>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={createLeadMutation.isPending}
-                    className="w-full sm:w-auto"
-                  >
-                    {createLeadMutation.isPending
-                      ? "Criando..."
-                      : `Criar ${terminology.singular}`}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              {terminology.novo}
+            </Button>
           </div>
         </div>
 
@@ -794,7 +619,7 @@ const Leads = () => {
           open={isCreateFolderDialogOpen}
           onOpenChange={setIsCreateFolderDialogOpen}
           onFolderCreated={(folderId) => {
-            setSelectedFolderId(folderId);
+            handleSelectFolder(folderId);
             queryClient.invalidateQueries({ queryKey: ["leads-counts"] });
           }}
         />
@@ -803,11 +628,32 @@ const Leads = () => {
         <FolderTabs
           folders={folders}
           selectedFolderId={selectedFolderId}
-          onSelectFolder={(folderId) => {
-            setSelectedFolderId(folderId);
-            setCurrentPage(1);
-          }}
+          onSelectFolder={handleSelectFolder}
           onCreateFolder={() => setIsCreateFolderDialogOpen(true)}
+          onDeleteFolder={async (folderId) => {
+            try {
+              // First delete all lead-folder relations for this folder
+              await supabase
+                .from("lead_folder_relations")
+                .delete()
+                .eq("folder_id", folderId);
+
+              // Then delete the folder itself
+              const { error } = await supabase
+                .from("lead_folders")
+                .delete()
+                .eq("id", folderId);
+
+              if (error) throw error;
+
+              toast.success("Pasta excluída com sucesso!");
+              queryClient.invalidateQueries({ queryKey: ["leads"] });
+              queryClient.invalidateQueries({ queryKey: ["lead-folders"] });
+              queryClient.invalidateQueries({ queryKey: ["leads-counts"] });
+            } catch (err: any) {
+              toast.error(err.message || "Erro ao excluir pasta");
+            }
+          }}
           totalLeadsCount={totalLeadsCount}
           generalLeadsCount={generalLeadsCount}
           allowedFolderIds={allowedFolderIds}
@@ -816,36 +662,49 @@ const Leads = () => {
 
         {/* Bulk action bar */}
         {isSelectionMode && selectedLeads.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-4 p-3 glass rounded-xl shadow-sm border-border/50">
-            <span className="text-sm font-medium text-foreground">
-              {selectedLeads.size} selecionado
-              {selectedLeads.size > 1 ? "s" : ""}
-            </span>
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={selectAll}>
-              {isSelectingAll
-                ? "Selecionando..."
-                : allSelected
-                  ? "Desselecionar todos"
-                  : `Selecionar todos (${totalItems.toLocaleString("pt-BR")})`}
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportSelectedToCSV}>
-              <Download className="h-4 w-4 mr-1" />
-              Exportar Lista
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Excluir
-            </Button>
-            <Button variant="default" size="sm" onClick={handleSendMessage}>
-              <MessageSquare className="h-4 w-4 mr-1" />
-              Enviar mensagem
-            </Button>
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 w-full sm:w-auto px-4 sm:px-0">
+            <div className="flex flex-wrap justify-center sm:flex-nowrap items-center gap-1.5 sm:gap-2 py-3 px-4 sm:px-5 glass rounded-2xl sm:rounded-full shadow-2xl border border-border/50 bg-background/80 backdrop-blur-md">
+              <span className="text-sm font-semibold text-foreground px-2 flex-grow sm:flex-grow-0 text-center sm:text-left mb-2 sm:mb-0 w-full sm:w-auto">
+                {selectedLeads.size} selecionado{selectedLeads.size > 1 ? "s" : ""}
+              </span>
+              <div className="hidden sm:block h-5 w-[1px] bg-border/80 mx-1"></div>
+
+              <div className="flex flex-wrap sm:flex-nowrap justify-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                <Button variant="ghost" size="sm" className="rounded-full h-9 hover:bg-muted/80 text-xs sm:text-sm" onClick={selectAll}>
+                  {isSelectingAll
+                    ? "Selecionando..."
+                    : allSelected
+                      ? "Desselecionar"
+                      : `Todos (${totalItems.toLocaleString("pt-BR")})`}
+                </Button>
+                <Button variant="ghost" size="sm" className="rounded-full h-9 hover:bg-muted/80 text-xs sm:text-sm" onClick={exportSelectedToCSV}>
+                  <Download className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full h-9 hover:bg-muted/80 text-xs sm:text-sm"
+                  onClick={() => setShowMoveToFolderDialog(true)}
+                >
+                  <FolderInput className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Mover</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full h-9 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs sm:text-sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Excluir</span>
+                </Button>
+                <Button variant="default" size="sm" className="rounded-full h-9 shadow-md shadow-primary/20 text-xs sm:text-sm" onClick={handleSendMessage}>
+                  <MessageSquare className="h-4 w-4 mr-1.5" />
+                  Mensagem
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -862,90 +721,178 @@ const Leads = () => {
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-4 sm:w-4 text-muted-foreground" />
           </div>
 
-          {/* Filters */}
-          <div className="flex gap-3 flex-wrap">
-            <Select value={statusFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
-                <SelectValue placeholder="Todos os tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                <SelectItem value="favorites">⭐ Favoritos</SelectItem>
-                <SelectItem value="new">Novo</SelectItem>
-                <SelectItem value="prospect">Prospecção</SelectItem>
-                <SelectItem value="contacted">Contatado</SelectItem>
-                <SelectItem value="qualified">Qualificado</SelectItem>
-                <SelectItem value="converted">Convertido</SelectItem>
-                <SelectItem value="lost">Perdido</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={sortOrder}
-              onValueChange={(v: LeadsSortOrder) => setSortOrder(v)}
-            >
-              <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Mais recentes" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Mais recentes</SelectItem>
-                <SelectItem value="alphabetical">Ordem alfabética</SelectItem>
-                <SelectItem value="score">Maior score</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Filters - Responsive */}
+          <div className="flex gap-3 w-full sm:w-auto">
+            {/* Mobile Filters Dropdown */}
+            <div className="sm:hidden w-full">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/50 text-muted-foreground">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filtros e Ordenação
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-[calc(100vw-2rem)] mx-4 p-4 glass border-border/50 rounded-xl space-y-5 animate-in slide-in-from-bottom-2 shadow-xl">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">Status</Label>
+                    <Select value={statusFilter} onValueChange={handleFilterChange}>
+                      <SelectTrigger className="rounded-xl h-12 w-full bg-background/50 border-border/60">
+                        <SelectValue placeholder="Todos os tipos" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        <SelectItem value="favorites">⭐ Favoritos</SelectItem>
+                        <SelectItem value="new">Novo</SelectItem>
+                        <SelectItem value="prospect">Prospecção</SelectItem>
+                        <SelectItem value="contacted">Contatado</SelectItem>
+                        <SelectItem value="qualified">Qualificado</SelectItem>
+                        <SelectItem value="converted">Convertido</SelectItem>
+                        <SelectItem value="lost">Perdido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">Ordenação</Label>
+                    <Select value={sortOrder} onValueChange={(v: LeadsSortOrder) => setSortOrder(v)}>
+                      <SelectTrigger className="rounded-xl h-12 w-full bg-background/50 border-border/60">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                          <SelectValue placeholder="Mais recentes" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="recent">Mais recentes</SelectItem>
+                        <SelectItem value="alphabetical">Ordem alfabética</SelectItem>
+                        <SelectItem value="score">Maior score</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop Filters */}
+            <div className="hidden sm:flex gap-3">
+              <Select value={statusFilter} onValueChange={handleFilterChange}>
+                <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  <SelectItem value="favorites">⭐ Favoritos</SelectItem>
+                  <SelectItem value="new">Novo</SelectItem>
+                  <SelectItem value="prospect">Prospecção</SelectItem>
+                  <SelectItem value="contacted">Contatado</SelectItem>
+                  <SelectItem value="qualified">Qualificado</SelectItem>
+                  <SelectItem value="converted">Convertido</SelectItem>
+                  <SelectItem value="lost">Perdido</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={sortOrder}
+                onValueChange={(v: LeadsSortOrder) => setSortOrder(v)}
+              >
+                <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Mais recentes" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Mais recentes</SelectItem>
+                  <SelectItem value="alphabetical">Ordem alfabética</SelectItem>
+                  <SelectItem value="score">Maior score</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">Carregando...</div>
-        ) : (
+          <div className="w-full space-y-4 animate-in fade-in duration-500">
+            {/* Mobile Skeleton */}
+            <div className="md:hidden grid grid-cols-1 gap-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="p-4 rounded-xl border border-border/50 bg-card/50 space-y-4 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2 w-2/3">
+                      <Skeleton className="h-5 w-full bg-muted/60" />
+                      <Skeleton className="h-4 w-3/4 bg-muted/60" />
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-full bg-muted/60" />
+                  </div>
+                  <div className="pt-2">
+                    <Skeleton className="h-4 w-1/2 bg-muted/60" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop Skeleton */}
+            <div className="hidden md:block border border-border/50 rounded-xl overflow-hidden bg-card/50 shadow-sm">
+              <div className="border-b border-border/50 p-4 flex gap-4 bg-muted/20">
+                <Skeleton className="h-5 w-8 bg-muted/60" />
+                <Skeleton className="h-5 w-1/4 bg-muted/60" />
+                <Skeleton className="h-5 w-1/4 bg-muted/60" />
+                <Skeleton className="h-5 w-1/5 bg-muted/60" />
+                <Skeleton className="h-5 w-1/6 bg-muted/60" />
+                <Skeleton className="h-5 w-8 ml-auto bg-muted/60" />
+              </div>
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="p-4 flex gap-4 border-b border-border/10 last:border-0 items-center">
+                  <Skeleton className="h-4 w-8 bg-muted/40" />
+                  <div className="w-1/4 space-y-2">
+                    <Skeleton className="h-4 w-3/4 bg-muted/40" />
+                    <Skeleton className="h-3 w-1/2 bg-muted/30" />
+                  </div>
+                  <Skeleton className="h-4 w-1/4 bg-muted/40" />
+                  <Skeleton className="h-6 w-20 rounded-full bg-muted/40" />
+                  <Skeleton className="h-4 w-1/6 bg-muted/40" />
+                  <Skeleton className="h-8 w-8 rounded-md ml-auto bg-muted/40" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : paginatedLeads && paginatedLeads.length > 0 ? (
           <>
             {/* Mobile: Cards */}
             <div className="md:hidden grid grid-cols-1 gap-4">
-              {paginatedLeads?.map((lead) => (
-                <LeadCard
-                  key={lead.id}
-                  lead={lead}
-                  onClick={() => {
-                    if (isSelectionMode) {
-                      toggleLeadSelection(lead.id);
-                    } else {
-                      navigate(`/leads/${lead.id}`);
-                    }
-                  }}
-                  isSelectionMode={isSelectionMode}
-                  isSelected={selectedLeads.has(lead.id)}
-                  onSelect={toggleLeadSelection}
-                />
+              {paginatedLeads.map((lead) => (
+                <div key={lead.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: `${Math.random() * 150}ms` }}>
+                  <LeadCard
+                    lead={lead}
+                    onClick={() => {
+                      if (isSelectionMode) {
+                        toggleLeadSelection(lead.id);
+                      } else {
+                        navigate(`/leads/${lead.id}`);
+                      }
+                    }}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedLeads.has(lead.id)}
+                    onSelect={toggleLeadSelection}
+                  />
+                </div>
               ))}
             </div>
 
             {/* Desktop: Table */}
-            <div className="hidden md:block">
-              {paginatedLeads && paginatedLeads.length > 0 ? (
-                <LeadsTable
-                  leads={paginatedLeads}
-                  isSelectionMode={isSelectionMode}
-                  selectedLeads={selectedLeads}
-                  onSelect={toggleLeadSelection}
-                  onLeadClick={(id) => navigate(`/leads/${id}`)}
-                  onSelectAll={selectAll}
-                  allSelected={allSelected}
-                  someSelected={selectedLeads.size > 0 && !allSelected}
-                />
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  Nenhum {terminology.singularLower} encontrado.
-                </div>
-              )}
+            <div className="hidden md:block animate-in fade-in duration-500">
+              <LeadsTable
+                leads={paginatedLeads}
+                isSelectionMode={isSelectionMode}
+                selectedLeads={selectedLeads}
+                onSelect={toggleLeadSelection}
+                onLeadClick={(id) => navigate(`/leads/${id}`)}
+                onSelectAll={selectAll}
+                allSelected={allSelected}
+                someSelected={selectedLeads.size > 0 && !allSelected}
+              />
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-                <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 animate-in fade-in duration-500">
+                <p className="text-sm text-muted-foreground font-medium">
                   Mostrando {startIndex + 1}-{endIndex} de{" "}
                   {totalItems.toLocaleString("pt-BR")} resultados
                 </p>
@@ -999,6 +946,31 @@ const Leads = () => {
               </div>
             )}
           </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-500 glass rounded-2xl border border-border/50 shadow-sm">
+            <div className="h-24 w-24 bg-primary/10 text-primary flex items-center justify-center rounded-full mb-6 relative group">
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500 opacity-50"></div>
+              <Inbox className="h-10 w-10 relative z-10" strokeWidth={1.5} />
+              <div className="absolute 0-bottom-1 right-2 h-6 w-6 bg-background rounded-full flex items-center justify-center z-20">
+                <div className="h-4 w-4 bg-primary/30 rounded-full animate-ping absolute"></div>
+                <div className="h-2.5 w-2.5 bg-primary rounded-full relative z-10"></div>
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold mb-3 tracking-tight">Nenhum {terminology.singularLower} encontrado</h3>
+            <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
+              Sua lista de {terminology.pluralLower} está vazia ou os filtros aplicados não retornaram resultados. Adicione um novo contato ou importe uma lista.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto rounded-xl shadow-lg shadow-primary/25 h-12 px-8 font-medium transition-all hover:scale-[1.02]">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar {terminology.singular}
+              </Button>
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="w-full sm:w-auto rounded-xl h-12 px-8 font-medium transition-all hover:scale-[1.02] border-border/60 hover:bg-muted/50">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar Lista
+              </Button>
+            </div>
+          </div>
         )}
 
         {/* Delete confirmation dialog */}
@@ -1033,6 +1005,26 @@ const Leads = () => {
           onOpenChange={setShowBroadcastDialog}
           selectedLeads={selectedLeadsData}
           onComplete={handleBroadcastComplete}
+        />
+
+        {/* Move to folder dialog */}
+        <MoveToFolderDialog
+          open={showMoveToFolderDialog}
+          onOpenChange={setShowMoveToFolderDialog}
+          selectedLeads={selectedLeads}
+          folders={folders}
+          onSuccess={() => {
+            setIsSelectionMode(false);
+            setSelectedLeads(new Set());
+          }}
+        />
+
+        {/* Create Lead Dialog */}
+        <CreateLeadDialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          workspaceId={profile?.workspace_id || ""}
+          terminology={terminology}
         />
       </div>
     </div>

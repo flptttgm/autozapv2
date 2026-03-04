@@ -1,13 +1,20 @@
 import { memo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   Phone,
   Mail,
@@ -34,7 +41,8 @@ import {
   UserCheck,
   AtSign,
   Tag,
-  ShieldAlert
+  ShieldAlert,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -80,6 +88,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
   const [showAddTagDialog, setShowAddTagDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Fetch tags assigned to this lead
   const { data: leadTags = [], refetch: refetchTags } = useQuery({
@@ -417,6 +426,23 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
     enabled: !!lead?.id,
   });
 
+  // Fetch notes from messages table (new system)
+  const { data: messageNotes = [] } = useQuery({
+    queryKey: ["lead-message-notes", lead?.id],
+    queryFn: async () => {
+      if (!lead?.id) return [];
+      const { data, error } = await supabase
+        .from("messages")
+        .select("id, content, created_at, metadata")
+        .eq("lead_id", lead.id)
+        .eq("message_type", "note")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!lead?.id,
+  });
+
   if (!lead) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -428,7 +454,12 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
   const displayName = lead.name || "Sem nome";
   const metadata = lead.metadata || {};
   const origin = metadata.origin || metadata.source || null;
-  const notes = metadata.notes || [];
+  // Merge notes from metadata (old) and messages table (new)
+  const metadataNotes = (metadata.notes || []).map((n: any) => ({ content: n.content, date: n.date, source: 'metadata' as const }));
+  const messagesNotes = messageNotes.map((n: any) => ({ content: n.content, date: n.created_at, source: 'messages' as const, messageId: n.id, attachment: n.metadata?.attachment }));
+  const notes = [...metadataNotes, ...messagesNotes].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   // Generate avatar color from name
   const getAvatarColor = (name: string) => {
@@ -668,7 +699,7 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
           <Separator className="bg-white/5" />
 
           {/* Notes Section */}
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
@@ -688,20 +719,65 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
 
             <div className="space-y-3">
               {notes.length > 0 ? (
-                [...notes].reverse().map((note: { content: string; date: string }, index: number) => (
-                  <div key={index} className="bg-white/5 border border-white/5 hover:border-white/10 transition-colors rounded-xl p-3.5 text-sm group/note relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 group-hover/note:bg-primary transition-colors" />
-                    <p className="whitespace-pre-wrap break-words text-foreground/90 pl-1">{note.content}</p>
-                    <span className="text-[10px] font-medium text-muted-foreground mt-2 block pl-1">
-                      {format(new Date(note.date), "dd/MM/yyyy • HH:mm")}
-                    </span>
-                  </div>
+                notes.map((note: any, index: number) => (
+                  <ContextMenu key={`note-${index}`}>
+                    <ContextMenuTrigger asChild>
+                      <div className="bg-white/5 border border-white/5 hover:border-white/10 transition-colors rounded-xl p-3.5 text-sm group/note relative overflow-hidden cursor-default">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 group-hover/note:bg-primary transition-colors" />
+                        {note.content && <p className="whitespace-pre-wrap break-words text-foreground/90 pl-1">{note.content}</p>}
+                        {note.attachment && (
+                          <a href={note.attachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 mt-1.5 pl-1 text-xs text-primary hover:underline">
+                            📎 {note.attachment.name}
+                          </a>
+                        )}
+                        <span className="text-[10px] font-medium text-muted-foreground mt-2 block pl-1">
+                          {format(new Date(note.date), "dd/MM/yyyy • HH:mm")}
+                        </span>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-48">
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2"
+                        onClick={async () => {
+                          try {
+                            if (note.source === 'messages' && note.messageId) {
+                              const { error } = await supabase
+                                .from("messages")
+                                .delete()
+                                .eq("id", note.messageId);
+                              if (error) throw error;
+                              queryClient.invalidateQueries({ queryKey: ["lead-message-notes", lead?.id] });
+                            } else {
+                              // Remove from metadata
+                              const currentNotes = (metadata.notes || []) as any[];
+                              const updatedNotes = currentNotes.filter((_: any, i: number) => {
+                                return !(_.content === note.content && _.date === note.date);
+                              });
+                              const { error } = await supabase
+                                .from("leads")
+                                .update({ metadata: { ...metadata, notes: updatedNotes } as any })
+                                .eq("id", lead.id);
+                              if (error) throw error;
+                              onLeadUpdated?.();
+                            }
+                            queryClient.invalidateQueries({ queryKey: ["lead-timeline", lead?.id] });
+                            toast.success("Anotação excluída!");
+                          } catch (err: any) {
+                            toast.error("Erro ao excluir: " + err.message);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir anotação
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
-                  <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
-                  <p className="text-sm">Nenhuma anotação ainda</p>
-                  <p className="text-xs">Clique em "Novo" para adicionar</p>
+                <div className="flex flex-col items-center justify-center py-3 text-center text-muted-foreground">
+                  <MessageSquare className="h-5 w-5 mb-1.5 opacity-50" />
+                  <p className="text-xs">Nenhuma anotação ainda</p>
+                  <p className="text-[10px]">Clique em "Novo" para adicionar</p>
                 </div>
               )}
             </div>
@@ -811,7 +887,6 @@ export const ContactDetailsPanel = memo(function ContactDetailsPanel({
         open={showAddNoteDialog}
         onOpenChange={setShowAddNoteDialog}
         leadId={lead.id}
-        currentMetadata={metadata}
         onNoteAdded={() => onLeadUpdated?.()}
       />
     </div>

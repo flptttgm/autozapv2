@@ -1,8 +1,23 @@
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Folder, FolderOpen, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Folder, FolderOpen, Plus, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface LeadFolder {
   id: string;
@@ -16,14 +31,13 @@ export interface LeadFolder {
 
 interface FolderTabsProps {
   folders: LeadFolder[];
-  selectedFolderId: string | null; // null = "Todos", "general" = pasta geral (sem folder_id)
+  selectedFolderId: string | null;
   onSelectFolder: (folderId: string | null) => void;
   onCreateFolder: () => void;
+  onDeleteFolder?: (folderId: string) => void;
   totalLeadsCount?: number;
   generalLeadsCount?: number;
-  /** null = show all (admin), string[] = only these folder IDs (member) */
   allowedFolderIds?: string[] | null;
-  /** Whether the user can manage team/create folders (owner/admin) */
   canManageTeam?: boolean;
 }
 
@@ -32,39 +46,13 @@ export function FolderTabs({
   selectedFolderId,
   onSelectFolder,
   onCreateFolder,
+  onDeleteFolder,
   totalLeadsCount = 0,
   generalLeadsCount = 0,
   allowedFolderIds = null,
   canManageTeam = true,
 }: FolderTabsProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const checkScroll = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
-    }
-  };
-
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener("resize", checkScroll);
-    return () => window.removeEventListener("resize", checkScroll);
-  }, [folders]);
-
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const scrollAmount = 200;
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-      setTimeout(checkScroll, 300);
-    }
-  };
+  const [folderToDelete, setFolderToDelete] = useState<LeadFolder | null>(null);
 
   const TabButton = ({
     isActive,
@@ -85,10 +73,10 @@ export function FolderTabs({
       onClick={onClick}
       className={cn(
         "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
-        "border hover:bg-accent/50",
+        "border",
         isActive
-          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-          : "bg-background text-muted-foreground border-border hover:text-foreground"
+          ? "bg-primary text-primary-foreground border-primary shadow-sm hover:bg-primary/90"
+          : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-foreground"
       )}
     >
       <Icon
@@ -111,91 +99,112 @@ export function FolderTabs({
     </button>
   );
 
-  return (
-    <div className="relative flex items-center gap-2 mb-4">
-      {/* Left scroll button */}
-      {canScrollLeft && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-0 z-10 h-8 w-8 bg-background/80 backdrop-blur-sm shadow-md"
-          onClick={() => scroll("left")}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-      )}
+  const handleConfirmDelete = () => {
+    if (folderToDelete && onDeleteFolder) {
+      onDeleteFolder(folderToDelete.id);
+      // If the deleted folder was selected, go back to "Todos"
+      if (selectedFolderId === folderToDelete.id) {
+        onSelectFolder(null);
+      }
+    }
+    setFolderToDelete(null);
+  };
 
-      {/* Scrollable tabs container */}
-      <div
-        ref={scrollRef}
-        onScroll={checkScroll}
-        className={cn(
-          "flex items-center gap-2 overflow-x-auto scrollbar-hide py-1",
-          canScrollLeft && "pl-10",
-          canScrollRight && "pr-10"
-        )}
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {/* Tab: Todos (admin only) */}
-        {(allowedFolderIds === null) && (
+  return (
+    <>
+      <div className="relative w-full mb-4">
+        <div className="flex flex-wrap items-center gap-2 py-1 w-full">
+          {/* Tab: Todos (leads sem pasta) */}
           <TabButton
-            isActive={selectedFolderId === null}
+            isActive={selectedFolderId === null || selectedFolderId === "general"}
             onClick={() => onSelectFolder(null)}
             icon={FolderOpen}
             label="Todos"
-            count={totalLeadsCount}
+            count={generalLeadsCount}
           />
-        )}
 
-        {/* Tab: Geral (leads sem pasta) - visible to everyone */}
-        <TabButton
-          isActive={selectedFolderId === "general"}
-          onClick={() => onSelectFolder("general")}
-          icon={Folder}
-          label="Geral"
-          count={generalLeadsCount}
-        />
+          {/* Tabs: Pastas do usuário (filtered by access) */}
+          {folders
+            .filter((folder) => allowedFolderIds === null || allowedFolderIds.includes(folder.id))
+            .map((folder) =>
+              canManageTeam ? (
+                <ContextMenu key={folder.id}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <TabButton
+                        isActive={selectedFolderId === folder.id}
+                        onClick={() => onSelectFolder(folder.id)}
+                        icon={Folder}
+                        label={folder.name}
+                        count={folder.lead_count}
+                        color={folder.color}
+                      />
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2"
+                      onClick={() => setFolderToDelete(folder)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir pasta
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              ) : (
+                <TabButton
+                  key={folder.id}
+                  isActive={selectedFolderId === folder.id}
+                  onClick={() => onSelectFolder(folder.id)}
+                  icon={Folder}
+                  label={folder.name}
+                  count={folder.lead_count}
+                  color={folder.color}
+                />
+              )
+            )}
 
-        {/* Tabs: Pastas do usuário (filtered by access) */}
-        {folders
-          .filter((folder) => allowedFolderIds === null || allowedFolderIds.includes(folder.id))
-          .map((folder) => (
-            <TabButton
-              key={folder.id}
-              isActive={selectedFolderId === folder.id}
-              onClick={() => onSelectFolder(folder.id)}
-              icon={Folder}
-              label={folder.name}
-              count={folder.lead_count}
-              color={folder.color}
-            />
-          ))}
-
-        {/* Botão: Criar pasta (admin only) */}
-        {canManageTeam && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex items-center gap-1.5 px-3 text-muted-foreground hover:text-foreground whitespace-nowrap"
-            onClick={onCreateFolder}
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nova pasta</span>
-          </Button>
-        )}
+          {/* Botão: Criar pasta (admin only) */}
+          {canManageTeam && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1.5 px-3 text-muted-foreground hover:text-foreground whitespace-nowrap"
+              onClick={onCreateFolder}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nova pasta</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Right scroll button */}
-      {canScrollRight && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-0 z-10 h-8 w-8 bg-background/80 backdrop-blur-sm shadow-md"
-          onClick={() => scroll("right")}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
+      {/* Confirmation dialog for folder deletion */}
+      <AlertDialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir pasta "{folderToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A pasta será excluída permanentemente.
+              {folderToDelete && folderToDelete.lead_count > 0 && (
+                <>
+                  <br /><br />
+                  Os <strong>{folderToDelete.lead_count} contatos</strong> desta pasta não serão excluídos — eles voltarão para a aba "Todos".
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

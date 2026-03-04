@@ -1,37 +1,15 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "@/components/settings/GeneralSettings";
-import { CalendarSettings } from "@/components/settings/CalendarSettings";
 import { TeamSettings } from "@/components/settings/TeamSettings";
 import { ManageSubscription } from "@/components/subscription/ManageSubscription";
 import { PixSettings } from "@/components/settings/PixSettings";
+import { ProfileSettings } from "@/components/settings/ProfileSettings";
 
 const Settings = () => {
-  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "general";
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
-  // Get workspace ID
-  useQuery({
-    queryKey: ["user-workspace"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("workspace_id")
-        .eq("id", user?.id)
-        .single();
-
-      if (error) throw error;
-      setWorkspaceId(data?.workspace_id);
-      return data?.workspace_id;
-    },
-    enabled: !!user?.id,
-  });
 
   return (
     <div className="relative p-4 sm:p-6 lg:p-8 pb-32 md:pb-8 min-h-full overflow-hidden">
@@ -53,10 +31,10 @@ const Settings = () => {
               Geral
             </TabsTrigger>
             <TabsTrigger
-              value="subscription"
+              value="profile"
               className="text-xs sm:text-sm data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-lg"
             >
-              Assinatura
+              Perfil
             </TabsTrigger>
             <TabsTrigger
               value="team"
@@ -65,38 +43,41 @@ const Settings = () => {
               Equipe
             </TabsTrigger>
             <TabsTrigger
+              value="subscription"
+              className="text-xs sm:text-sm data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-lg"
+            >
+              Assinatura
+            </TabsTrigger>
+            <TabsTrigger
               value="pix"
               className="text-xs sm:text-sm data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-lg"
             >
               PIX
             </TabsTrigger>
-            <TabsTrigger
-              value="calendar"
-              className="text-xs sm:text-sm data-[state=active]:bg-background/80 data-[state=active]:shadow-sm rounded-lg"
-            >
-              Calendário
-            </TabsTrigger>
+
           </TabsList>
 
           <TabsContent value="general">
             <GeneralSettings />
           </TabsContent>
 
-          <TabsContent value="subscription">
-            <ManageSubscription />
+          <TabsContent value="profile">
+            <ProfileSettings />
           </TabsContent>
 
           <TabsContent value="team">
             <TeamSettings />
           </TabsContent>
 
+          <TabsContent value="subscription">
+            <ManageSubscription />
+          </TabsContent>
+
           <TabsContent value="pix">
             <PixSettings />
           </TabsContent>
 
-          <TabsContent value="calendar">
-            <CalendarSettings workspaceId={workspaceId} />
-          </TabsContent>
+
         </Tabs>
       </div>
     </div>

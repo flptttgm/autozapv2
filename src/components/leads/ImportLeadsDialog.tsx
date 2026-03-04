@@ -80,7 +80,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
   const [existingPhones, setExistingPhones] = useState<Map<string, string>>(new Map()); // phone -> lead_id
   const [duplicateAction, setDuplicateAction] = useState<DuplicateAction>("skip");
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
-  
+
   // Folder selection state
   const [folderOption, setFolderOption] = useState<"general" | "new" | "existing">("general");
   const [newFolderName, setNewFolderName] = useState("");
@@ -134,7 +134,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
     const tabCount = (firstLine.match(/\t/g) || []).length;
     const commaCount = (firstLine.match(/,/g) || []).length;
     const semicolonCount = (firstLine.match(/;/g) || []).length;
-    
+
     if (tabCount >= commaCount && tabCount >= semicolonCount) return "\t";
     if (semicolonCount >= commaCount) return ";";
     return ",";
@@ -143,13 +143,13 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
   const parseCSV = (text: string): { headers: string[]; rows: string[][] } => {
     const separator = detectSeparator(text);
     const lines = text.trim().split("\n").filter(line => line.trim());
-    
+
     if (lines.length < 2) {
       throw new Error("O arquivo deve ter pelo menos uma linha de cabeçalho e uma linha de dados");
     }
 
     const headers = lines[0].split(separator).map(h => h.trim().toLowerCase());
-    const rows = lines.slice(1).map(line => 
+    const rows = lines.slice(1).map(line =>
       line.split(separator).map(cell => cell.trim())
     );
 
@@ -199,7 +199,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
         .from("leads")
         .select("id, phone")
         .eq("workspace_id", profile?.workspace_id);
-      
+
       const phoneMap = new Map<string, string>();
       existingLeads?.forEach(l => {
         phoneMap.set(normalizePhone(l.phone), l.id);
@@ -224,13 +224,13 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
 
     // Set para rastrear telefones já vistos dentro do arquivo
     const seenInFile = new Set<string>();
-    
+
     const parsed: ParsedRow[] = rows.map(row => {
       const phone = normalizePhone(row[parseInt(columnMapping.phone)] || "");
       const name = columnMapping.name && columnMapping.name !== "__none__" ? row[parseInt(columnMapping.name)] : undefined;
       const email = columnMapping.email && columnMapping.email !== "__none__" ? row[parseInt(columnMapping.email)] : undefined;
       const statusRaw = columnMapping.status && columnMapping.status !== "__none__" ? row[parseInt(columnMapping.status)]?.toLowerCase() : undefined;
-      
+
       // Map status values
       let status: string | undefined;
       if (statusRaw) {
@@ -248,10 +248,10 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
       const result = rowSchema.safeParse(rowData);
       const existingLeadId = existingPhones.get(phone);
       const isDuplicateInDb = !!existingLeadId;
-      
+
       // Verificar se é duplicata dentro do próprio arquivo
       const isDuplicateInFile = phone ? seenInFile.has(phone) : false;
-      
+
       // Marcar telefone como visto para próximas linhas
       if (phone) {
         seenInFile.add(phone);
@@ -260,7 +260,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
       // Determinar erro e validade
       let error: string | undefined;
       let isValid = result.success;
-      
+
       if (!result.success) {
         error = result.error.errors[0]?.message;
       } else if (isDuplicateInFile) {
@@ -284,25 +284,25 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
 
   const importMutation = useMutation({
     mutationFn: async ({ leadsToImport, action, workspaceId, folderId }: { leadsToImport: ParsedRow[]; action: DuplicateAction; workspaceId: string; folderId: string | null }) => {
-      console.log("[Import] Iniciando importação...", { 
-        totalRows: leadsToImport.length, 
-        action, 
+      console.log("[Import] Iniciando importação...", {
+        totalRows: leadsToImport.length,
+        action,
         workspaceId,
-        folderId 
+        folderId
       });
-      
+
       const validLeads = leadsToImport.filter(l => l.isValid);
       console.log("[Import] Leads válidos:", validLeads.length);
-      
+
       // Separate new leads from duplicates
       const newLeads = validLeads.filter(l => !l.isDuplicate);
       const duplicateLeads = validLeads.filter(l => l.isDuplicate);
       console.log("[Import] Novos:", newLeads.length, "| Duplicatas:", duplicateLeads.length);
-      
+
       let insertedCount = 0;
       let updatedCount = 0;
       const failedInserts: { phone: string; error: string }[] = [];
-      
+
       // Insert new leads in batches of 500 for performance
       if (newLeads.length > 0) {
         const leadsToInsert = newLeads.map(lead => ({
@@ -311,74 +311,101 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
           email: lead.email || null,
           status: (lead.status as any) || "new",
           workspace_id: workspaceId,
-          folder_id: folderId,
         }));
-        
+
         const BATCH_SIZE = 500;
         const totalBatches = Math.ceil(leadsToInsert.length / BATCH_SIZE);
-        
+
         console.log("[Import] Inserindo em", totalBatches, "batches de até", BATCH_SIZE, "leads");
         setImportProgress({ current: 0, total: leadsToInsert.length });
-        
+
         for (let i = 0; i < totalBatches; i++) {
           const start = i * BATCH_SIZE;
           const end = Math.min(start + BATCH_SIZE, leadsToInsert.length);
           const batch = leadsToInsert.slice(start, end);
-          
+
           console.log(`[Import] Batch ${i + 1}/${totalBatches}: inserindo ${batch.length} leads`);
-          
-          const { error } = await supabase.from("leads").insert(batch);
-          
+
+          const { data: insertedLeads, error } = await supabase.from("leads").insert(batch).select("id");
+
           if (error) {
             console.error(`[Import] Batch ${i + 1} falhou:`, error.message);
             failedInserts.push(...batch.map(l => ({ phone: l.phone, error: error.message })));
           } else {
             insertedCount += batch.length;
+
+            // Insert relations if a folder was selected
+            if (folderId && insertedLeads && insertedLeads.length > 0) {
+              const relationsToInsert = insertedLeads.map(l => ({
+                lead_id: l.id,
+                folder_id: folderId,
+                workspace_id: workspaceId
+              }));
+
+              const { error: relationError } = await supabase
+                .from("lead_folder_relations")
+                .upsert(relationsToInsert, { onConflict: 'lead_id, folder_id' });
+
+              if (relationError) {
+                console.error("[Import] Erro ao associar à pasta:", relationError.message);
+              }
+            }
           }
-          
+
           setImportProgress({ current: end, total: leadsToInsert.length });
         }
-        
+
         console.log("[Import] Inserção em batches concluída:", { insertedCount, falhas: failedInserts.length });
       }
-      
+
       // Handle duplicates based on action
       if (action === "update" && duplicateLeads.length > 0) {
         console.log("[Import] Atualizando duplicatas...");
-        
+
         for (const lead of duplicateLeads) {
           if (lead.existingLeadId) {
             const updateData: any = {};
             if (lead.name) updateData.name = lead.name;
             if (lead.email) updateData.email = lead.email;
             if (lead.status) updateData.status = lead.status;
-            
+
             // Only update if there's data to update
             if (Object.keys(updateData).length > 0) {
               const { error } = await supabase
                 .from("leads")
                 .update(updateData)
                 .eq("id", lead.existingLeadId);
-              
+
               if (error) {
                 console.error("[Import] Erro ao atualizar lead:", lead.existingLeadId, error.message);
               } else {
                 updatedCount++;
               }
             }
+
+            // Even if no data to update in leads table, if we selected a folder, add it
+            if (folderId) {
+              await supabase
+                .from("lead_folder_relations")
+                .upsert({
+                  lead_id: lead.existingLeadId,
+                  folder_id: folderId,
+                  workspace_id: workspaceId
+                }, { onConflict: 'lead_id, folder_id' });
+            }
           }
         }
         console.log("[Import] Atualizações concluídas:", updatedCount);
       }
-      
-      const result = { 
-        insertedCount, 
-        updatedCount, 
+
+      const result = {
+        insertedCount,
+        updatedCount,
         skippedCount: action === "skip" ? duplicateLeads.length : 0,
         failedCount: failedInserts.length,
         failedInserts
       };
-      
+
       console.log("[Import] Resultado final:", result);
       return result;
     },
@@ -386,7 +413,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
       console.log("[Import] onSuccess chamado!");
       setImportProgress(null);
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      
+
       const messages: string[] = [];
       if (insertedCount > 0) {
         messages.push(`${insertedCount} novo(s)`);
@@ -400,13 +427,13 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
       if (failedCount > 0) {
         messages.push(`${failedCount} com erro`);
       }
-      
+
       logChange({
         action: 'create',
         entity_type: 'lead',
         changes_summary: `Importação: ${messages.join(", ")}`,
       });
-      
+
       if (failedCount > 0) {
         toast.warning(`Importação parcial: ${messages.join(", ")}`);
       } else {
@@ -430,17 +457,17 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
 
   const handleImport = async () => {
     console.log("[Import] handleImport chamado");
-    
+
     // Validar workspace_id antes de prosseguir
     if (!profile?.workspace_id) {
       console.error("[Import] workspace_id não definido!");
       toast.error("Erro: workspace não identificado. Tente recarregar a página.");
       return;
     }
-    
+
     const validCount = parsedRows.filter(r => r.isValid).length;
     console.log("[Import] Registros válidos:", validCount);
-    
+
     if (validCount === 0) {
       toast.error("Nenhum registro válido para importar");
       return;
@@ -448,7 +475,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
 
     // Determine folder_id based on selection
     let folderId: string | null = null;
-    
+
     if (folderOption === "new" && newFolderName.trim()) {
       // Create new folder first
       try {
@@ -460,7 +487,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
           })
           .select()
           .single();
-        
+
         if (error) {
           if (error.code === "23505") {
             toast.error("Já existe uma pasta com esse nome");
@@ -479,10 +506,10 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
       folderId = selectedFolderId;
     }
     // If folderOption is "general", folderId stays null
-    
+
     console.log("[Import] Iniciando mutação com folderId:", folderId);
-    importMutation.mutate({ 
-      leadsToImport: parsedRows, 
+    importMutation.mutate({
+      leadsToImport: parsedRows,
       action: duplicateAction,
       workspaceId: profile.workspace_id,
       folderId
@@ -520,7 +547,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                 <TabsTrigger value="paste">Copiar/Colar</TabsTrigger>
                 <TabsTrigger value="upload">Upload CSV</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="paste" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Cole os dados da planilha</Label>
@@ -539,7 +566,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                   Processar Dados
                 </Button>
               </TabsContent>
-              
+
               <TabsContent value="upload" className="space-y-4 mt-4">
                 <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                   <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
@@ -567,9 +594,9 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
               <p className="text-xs text-muted-foreground">
                 Onde você quer salvar esses leads?
               </p>
-              
-              <RadioGroup 
-                value={folderOption} 
+
+              <RadioGroup
+                value={folderOption}
                 onValueChange={(v) => setFolderOption(v as "general" | "new" | "existing")}
                 className="space-y-2"
               >
@@ -594,7 +621,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                   </div>
                 )}
               </RadioGroup>
-              
+
               {folderOption === "new" && (
                 <Input
                   placeholder="Nome da pasta (ex: Black Friday 40k)"
@@ -604,7 +631,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                   maxLength={50}
                 />
               )}
-              
+
               {folderOption === "existing" && existingFolders.length > 0 && (
                 <Select value={selectedFolderId || ""} onValueChange={setSelectedFolderId}>
                   <SelectTrigger className="mt-2">
@@ -619,7 +646,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                   </SelectContent>
                 </Select>
               )}
-              
+
               <p className="text-xs text-muted-foreground mt-2">
                 💡 Pastas ajudam a organizar leads de campanhas diferentes sem misturar com seus contatos atuais
               </p>
@@ -642,7 +669,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
             <p className="text-sm text-muted-foreground">
               Mapeie as colunas do seu arquivo para os campos do sistema. O telefone é obrigatório.
             </p>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome</Label>
@@ -759,7 +786,7 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                 </Badge>
               )}
             </div>
-            
+
             {duplicateInDbCount > 0 && (
               <div className="flex items-center gap-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <span className="text-sm font-medium">Duplicados:</span>
@@ -773,8 +800,8 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                   </SelectContent>
                 </Select>
                 <span className="text-xs text-muted-foreground">
-                  {duplicateAction === "skip" 
-                    ? "Registros duplicados serão ignorados" 
+                  {duplicateAction === "skip"
+                    ? "Registros duplicados serão ignorados"
                     : "Registros existentes serão atualizados com os novos dados"
                   }
                 </span>
@@ -795,14 +822,14 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
                 </TableHeader>
                 <TableBody>
                   {parsedRows.map((row, idx) => (
-                    <TableRow 
-                      key={idx} 
+                    <TableRow
+                      key={idx}
                       className={
-                        !row.isValid 
-                          ? "bg-destructive/5" 
-                          : row.isDuplicate 
-                            ? duplicateAction === "skip" 
-                              ? "bg-yellow-500/5 opacity-50" 
+                        !row.isValid
+                          ? "bg-destructive/5"
+                          : row.isDuplicate
+                            ? duplicateAction === "skip"
+                              ? "bg-yellow-500/5 opacity-50"
                               : "bg-yellow-500/10"
                             : ""
                       }
@@ -853,8 +880,8 @@ export function ImportLeadsDialog({ open, onOpenChange }: ImportLeadsDialogProps
               <Button variant="outline" onClick={() => setStep("mapping")} disabled={importMutation.isPending}>
                 Voltar
               </Button>
-              <Button 
-                onClick={handleImport} 
+              <Button
+                onClick={handleImport}
                 disabled={totalToProcess === 0 || importMutation.isPending}
               >
                 {importMutation.isPending ? (

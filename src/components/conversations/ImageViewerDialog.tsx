@@ -7,11 +7,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  X, 
-  Download, 
-  Maximize2, 
-  Minimize2, 
+import {
+  X,
+  Download,
+  Maximize2,
+  Minimize2,
   Image as ImageIcon,
   ZoomIn,
   ZoomOut,
@@ -63,12 +63,12 @@ export function ImageViewerDialog({
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await fetch(imageUrl);
       if (!response.ok) {
         throw new Error("Falha ao carregar imagem");
       }
-      
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
@@ -84,13 +84,13 @@ export function ImageViewerDialog({
     try {
       const link = document.createElement("a");
       link.href = blobUrl || imageUrl;
-      
+
       // Extract filename from caption or URL
       let fileName = caption || "imagem";
       if (!fileName.includes(".")) {
         fileName += ".jpg";
       }
-      
+
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
@@ -130,12 +130,11 @@ export function ImageViewerDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent 
-        className={`p-0 gap-0 ${
-          isFullscreen 
-            ? "max-w-[95vw] w-[95vw] h-[95vh] max-h-[95vh]" 
+      <DialogContent
+        className={`p-0 gap-0 [&>button]:hidden ${isFullscreen
+            ? "max-w-[95vw] w-[95vw] h-[95vh] max-h-[95vh]"
             : "max-w-4xl w-[90vw] h-[80vh] max-h-[80vh]"
-        } transition-all duration-200`}
+          } transition-all duration-200`}
       >
         {/* Header */}
         <DialogHeader className="p-3 sm:p-4 border-b border-border bg-card/50 backdrop-blur-sm flex flex-row items-center justify-between space-y-0">
@@ -143,7 +142,7 @@ export function ImageViewerDialog({
             <ImageIcon className="h-4 w-4 text-primary shrink-0" />
             <span className="truncate">{displayName}</span>
           </DialogTitle>
-          
+
           <div className="flex items-center gap-1">
             {/* Zoom controls */}
             <Button
@@ -179,9 +178,9 @@ export function ImageViewerDialog({
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
-            
+
             <div className="w-px h-4 bg-border mx-1" />
-            
+
             {/* Fullscreen toggle */}
             <Button
               variant="ghost"
@@ -196,7 +195,7 @@ export function ImageViewerDialog({
                 <Maximize2 className="h-4 w-4" />
               )}
             </Button>
-            
+
             {/* Download */}
             <Button
               variant="ghost"
@@ -208,7 +207,7 @@ export function ImageViewerDialog({
             >
               <Download className="h-4 w-4" />
             </Button>
-            
+
             {/* Close */}
             <Button
               variant="ghost"
@@ -223,7 +222,7 @@ export function ImageViewerDialog({
         </DialogHeader>
 
         {/* Image Content */}
-        <div 
+        <div
           className="flex-1 flex items-center justify-center overflow-auto bg-black/90 min-h-0"
           onWheel={handleWheel}
         >

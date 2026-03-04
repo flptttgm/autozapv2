@@ -249,7 +249,7 @@ const LeadTableRow = ({
       {/* Cliente */}
       <TableCell className="py-4">
         <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 shrink-0">
+          <Avatar className="h-[51px] w-[51px] shrink-0">
             {photoUrl && !imageError && (
               <AvatarImage
                 src={photoUrl}

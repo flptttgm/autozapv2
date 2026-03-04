@@ -104,6 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        if (session?.user) {
+          localStorage.setItem('has_logged_in_before', 'true');
+        }
+
         const currentUserId = session?.user?.id ?? null;
         const wasLoggedIn = prevUserIdRef.current !== null;
         const isNowLoggedIn = currentUserId !== null;
@@ -134,6 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           // Clear all React Query cache on logout to prevent cross-session data leakage
           queryClient.clear();
+
+          // Clear session-specific UI state
+          sessionStorage.removeItem("plan_badge_dismissed");
 
           setTimeout(() => {
             logPlatformAction({

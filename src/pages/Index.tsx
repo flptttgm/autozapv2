@@ -1257,7 +1257,7 @@ const Index = () => {
         <div className="scale-[0.9] origin-top" style={{ width: '111.11%', marginLeft: '-5.55%' }}>
 
           {/* Integrated Hero Section (Stripe/Fintech Style) */}
-          <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-black text-neutral-900 dark:text-white mb-8 border border-border/50 dark:border-white/10 shadow-sm md:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+          <div className="relative overflow-hidden rounded-3xl bg-background text-foreground mb-8 border border-border/50 shadow-sm md:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             {/* Removed Dynamic Background Gradients */}
             {/* ... */}
 
@@ -1265,10 +1265,10 @@ const Index = () => {
               {/* Header Content */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="space-y-2">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-900 dark:text-gray-100 drop-shadow-sm">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-foreground drop-shadow-sm">
                     Visão Geral
                   </h1>
-                  <p className="text-neutral-500 dark:text-neutral-400 text-sm sm:text-base max-w-lg font-medium">
+                  <p className="text-muted-foreground text-sm sm:text-base max-w-lg font-medium">
                     Acompanhe em tempo real o desempenho do seu funil de
                     atendimento e a performance da equipe.
                   </p>
@@ -1339,7 +1339,7 @@ const Index = () => {
                       className="flex flex-col gap-3 group relative cursor-default"
                     >
                       {/* Stat Header */}
-                      <div className="flex items-center gap-2.5 text-neutral-500 dark:text-neutral-400">
+                      <div className="flex items-center gap-2.5 text-muted-foreground">
                         <div
                           className={cn(
                             "p-2.5 rounded-xl transition-colors duration-300",
@@ -1355,7 +1355,7 @@ const Index = () => {
 
                       {/* Stat Value & Trend */}
                       <div className="flex items-baseline gap-3">
-                        <span className="text-4xl lg:text-5xl font-black tracking-tighter text-neutral-900 dark:text-white drop-shadow-sm group-hover:scale-105 origin-left transition-transform duration-300">
+                        <span className="text-4xl lg:text-5xl font-black tracking-tighter text-foreground drop-shadow-sm group-hover:scale-105 origin-left transition-transform duration-300">
                           {stat.value}
                         </span>
                       </div>

@@ -87,7 +87,7 @@ import { AudioMessageBubble } from "@/components/conversations/AudioMessageBubbl
 import { PDFPreviewDialog } from "@/components/conversations/PDFPreviewDialog";
 import { ImageViewerDialog } from "@/components/conversations/ImageViewerDialog";
 import { ChatFolderTabs } from "@/components/conversations/ChatFolderTabs";
-import { useChatFolderAccess } from "@/hooks/useFolderAccess";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 
 // Indicator for AI responses based on audio transcription
 const TranscriptionIndicator = () => (
@@ -1202,111 +1202,89 @@ const MemoizedChatContent = memo(function ChatContent({
                                     />
                                   )}
                                 </div>
-                              ) : msg.message_type === "video" ? (
-                                <div className="flex flex-col gap-2">
-                                  <span className="flex items-center gap-2">
-                                    <Video className="h-4 w-4 text-primary" />
-                                    {msg.content}
-                                  </span>
-                                  {(msg.metadata as any)?.mediaUrl && (
-                                    <video
-                                      controls
-                                      src={(msg.metadata as any).mediaUrl}
-                                      className="max-w-xs rounded-lg"
-                                    />
-                                  )}
-                                </div>
-                              ) : msg.message_type === "document" ? (
-                                <div className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-primary" />
-                                    <span className="font-medium">
-                                      {msg.content}
-                                    </span>
-                                  </div>
-                                  {(msg.metadata as any)?.mediaUrl && (
-                                    <div className="flex items-center gap-3 ml-6">
-                                      {/* Check if it's a PDF for inline preview */}
-                                      {msg.content
-                                        ?.toLowerCase()
-                                        .endsWith(".pdf") ||
-                                        (msg.metadata as any)?.mimeType ===
-                                        "application/pdf" ||
-                                        (msg.metadata as any)?.fileName
-                                          ?.toLowerCase()
-                                          .endsWith(".pdf") ? (
-                                        <button
-                                          onClick={() =>
-                                            onOpenPdfPreview?.(
-                                              (msg.metadata as any).mediaUrl,
-                                              msg.content ||
-                                              (msg.metadata as any)
-                                                ?.fileName ||
-                                              "documento.pdf",
-                                            )
-                                          }
-                                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                          Visualizar
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={async () => {
-                                            try {
-                                              const response = await fetch(
-                                                (msg.metadata as any).mediaUrl,
-                                              );
-                                              const blob =
-                                                await response.blob();
-                                              const blobUrl =
-                                                URL.createObjectURL(blob);
-                                              window.open(blobUrl, "_blank");
-                                            } catch (error) {
-                                              toast.error(
-                                                "Erro ao abrir documento",
-                                              );
-                                            }
-                                          }}
-                                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                          Visualizar
-                                        </button>
+                              ) : msg.message_type === "video" || msg.message_type === "document" ? (
+                                (() => {
+                                  // Generic rendering for documents and videos
+                                  const meta = msg.metadata as any;
+                                  const fileName = (msg.content || meta?.fileName || "documento").toLowerCase();
+                                  const mimeType = (meta?.mimeType || meta?.zapi_payload?.document?.mimeType || meta?.zapi_payload?.video?.mimeType || "").toLowerCase();
+                                  const videoExts = [".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"];
+
+                                  const isVideoType = msg.message_type === "video" || mimeType.startsWith("video/") || videoExts.some(ext => fileName.endsWith(ext));
+                                  const isPdfType = fileName.endsWith(".pdf") || mimeType === "application/pdf";
+                                  const mediaUrl = meta?.mediaUrl;
+
+                                  return (
+                                    <div className="flex flex-col gap-2">
+                                      {/* Header Icon & Title */}
+                                      <div className="flex items-center gap-2">
+                                        {isVideoType ? <Video className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+                                        <span className="font-medium">{msg.content}</span>
+                                      </div>
+
+                                      {/* Media Content Region */}
+                                      {mediaUrl && (
+                                        <>
+                                          {isVideoType && (
+                                            <video controls src={mediaUrl} className="max-w-xs rounded-lg mb-1" />
+                                          )}
+
+                                          {/* Action Buttons */}
+                                          <div className={`flex items-center gap-3 ${isVideoType ? "ml-1" : "ml-6"}`}>
+                                            {isPdfType ? (
+                                              <button
+                                                onClick={() => onOpenPdfPreview?.(mediaUrl, msg.content || meta?.fileName || "documento.pdf")}
+                                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                                              >
+                                                <Eye className="h-3 w-3" />
+                                                Visualizar
+                                              </button>
+                                            ) : !isVideoType && (
+                                              <button
+                                                onClick={async () => {
+                                                  try {
+                                                    const response = await fetch(mediaUrl);
+                                                    const blob = await response.blob();
+                                                    window.open(URL.createObjectURL(blob), "_blank");
+                                                  } catch (error) {
+                                                    toast.error(`Erro ao abrir documento`);
+                                                  }
+                                                }}
+                                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                                              >
+                                                <Eye className="h-3 w-3" />
+                                                Visualizar
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={async () => {
+                                                try {
+                                                  const response = await fetch(mediaUrl);
+                                                  const blob = await response.blob();
+                                                  const blobUrl = URL.createObjectURL(blob);
+                                                  const link = document.createElement("a");
+                                                  link.href = blobUrl;
+                                                  link.download = msg.content || (isVideoType ? "video.mp4" : "documento");
+                                                  document.body.appendChild(link);
+                                                  link.click();
+                                                  document.body.removeChild(link);
+                                                  URL.revokeObjectURL(blobUrl);
+                                                  toast.success("Download iniciado!");
+                                                } catch (error) {
+                                                  toast.error(`Erro ao baixar ${isVideoType ? 'vídeo' : 'documento'}`);
+                                                }
+                                              }}
+                                              className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                                            >
+                                              <Download className="h-3 w-3" />
+                                              Baixar
+                                            </button>
+                                          </div>
+                                        </>
                                       )}
-                                      <button
-                                        onClick={async () => {
-                                          try {
-                                            const response = await fetch(
-                                              (msg.metadata as any).mediaUrl,
-                                            );
-                                            const blob = await response.blob();
-                                            const blobUrl =
-                                              URL.createObjectURL(blob);
-                                            const link =
-                                              document.createElement("a");
-                                            link.href = blobUrl;
-                                            link.download =
-                                              msg.content || "documento";
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                            URL.revokeObjectURL(blobUrl);
-                                            toast.success("Download iniciado!");
-                                          } catch (error) {
-                                            toast.error(
-                                              "Erro ao baixar documento",
-                                            );
-                                          }
-                                        }}
-                                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                                      >
-                                        <Download className="h-3 w-3" />
-                                        Baixar
-                                      </button>
                                     </div>
-                                  )}
-                                </div>
+                                  );
+                                })()
                               ) : msg.message_type === "call" ? (
                                 <div className="flex items-center gap-2 text-muted-foreground italic">
                                   <Phone className="h-4 w-4" />
@@ -1475,9 +1453,23 @@ const Conversations = () => {
   const { terminology } = useTerminology();
   const { user, profile } = useAuth();
 
-  // Chat folder access control
+  // Lead folder access control (reused for conversation tabs)
   const { allowedFolderIds: allowedChatFolderIds, isAdmin: canManageTeam } =
-    useChatFolderAccess();
+    useLeadFolderAccess();
+
+  // Fetch lead-folder relations for filtering conversations by lead folder
+  const { data: leadFolderRelations } = useQuery({
+    queryKey: ["lead-folder-relations-map", profile?.workspace_id],
+    queryFn: async () => {
+      if (!profile?.workspace_id) return [];
+      const { data, error } = await supabase
+        .from("lead_folder_relations")
+        .select("lead_id, folder_id");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!profile?.workspace_id,
+  });
 
   const formatMessageDate = useCallback((date: string) => {
     const messageDate = new Date(date);
@@ -1775,6 +1767,7 @@ const Conversations = () => {
             "chat_id, lead_id, created_at, content, direction, message_type, metadata, delivery_status, leads(id, name, phone, metadata, status, score, ai_enabled, avatar_url)",
           )
           .eq("workspace_id", profile.workspace_id)
+          .neq("message_type", "note")
           .order("created_at", { ascending: false })
           .limit(1000),
         supabase
@@ -1922,9 +1915,14 @@ const Conversations = () => {
       ? chats.filter((chat) => chat.instanceId === selectedInstance)
       : chats;
 
-    // Apply chat folder filter
-    if (selectedChatFolderId !== null) {
-      result = result.filter((chat) => chat.folder_id === selectedChatFolderId);
+    // Apply lead folder filter — show conversations whose lead belongs to the selected folder
+    if (selectedChatFolderId !== null && leadFolderRelations) {
+      const leadsInFolder = new Set(
+        leadFolderRelations
+          .filter((r: any) => r.folder_id === selectedChatFolderId)
+          .map((r: any) => r.lead_id)
+      );
+      result = result.filter((chat) => chat.lead_id && leadsInFolder.has(chat.lead_id));
     }
 
     // Apply search filter
@@ -1954,7 +1952,7 @@ const Conversations = () => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     });
-  }, [chats, selectedInstance, searchTerm, activeFilter, selectedChatFolderId]);
+  }, [chats, selectedInstance, searchTerm, activeFilter, selectedChatFolderId, leadFolderRelations]);
 
   // Fetch messages with loading state
   const { data: messages, isLoading: messagesLoading } = useQuery({
@@ -1968,6 +1966,7 @@ const Conversations = () => {
         .select("*")
         .eq("chat_id", selectedChatId)
         .eq("workspace_id", profile.workspace_id)
+        .neq("message_type", "note")
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -1979,6 +1978,7 @@ const Conversations = () => {
           .select("*")
           .eq("lead_id", selectedChatId)
           .eq("workspace_id", profile.workspace_id)
+          .neq("message_type", "note")
           .order("created_at", { ascending: true });
 
         if (leadError) throw leadError;

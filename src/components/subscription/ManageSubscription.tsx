@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CreditCard, Calendar, AlertTriangle, XCircle, RefreshCw, Loader2, BadgePercent, Sparkles } from "lucide-react";
-import { ReferralSection } from "./ReferralSection";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,13 +49,13 @@ export function ManageSubscription() {
     queryKey: ["subscription-details", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return null;
-      
+
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
         .eq("workspace_id", profile.workspace_id)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -68,14 +67,14 @@ export function ManageSubscription() {
     queryKey: ["payment-history", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return [];
-      
+
       const { data, error } = await supabase
         .from("payments_history")
         .select("*")
         .eq("workspace_id", profile.workspace_id)
         .order("created_at", { ascending: false })
         .limit(5);
-      
+
       if (error) throw error;
       return data;
     },
@@ -100,14 +99,14 @@ export function ManageSubscription() {
       // Update local subscription status regardless of Asaas status
       await supabase
         .from("subscriptions")
-        .update({ 
+        .update({
           status: "cancelled",
           asaas_subscription_id: null,
         })
         .eq("workspace_id", profile?.workspace_id);
 
       queryClient.invalidateQueries({ queryKey: ["subscription-details"] });
-      
+
       toast({
         title: "Assinatura cancelada",
         description: "Sua assinatura foi cancelada. Você ainda tem acesso até o fim do período pago.",
@@ -146,18 +145,18 @@ export function ManageSubscription() {
   const isRecurring = !!subscription.asaas_subscription_id;
   const isTrial = subscription.plan_type === "trial";
   const planPrice = !isTrial && PLAN_PRICES[subscription.plan_type as keyof typeof PLAN_PRICES];
-  const basePlanPrice = planPrice 
+  const basePlanPrice = planPrice
     ? (subscription.billing_cycle === "annual" ? planPrice.annual : planPrice.monthly)
     : 0;
-  
+
   // Use effective_price if available, otherwise calculate from discount or use base price
   const hasDiscount = subscription.discount_percent && subscription.discount_percent > 0;
-  const currentPrice = subscription.effective_price 
+  const currentPrice = subscription.effective_price
     ? Number(subscription.effective_price)
-    : hasDiscount 
+    : hasDiscount
       ? basePlanPrice * (1 - subscription.discount_percent! / 100)
       : basePlanPrice;
-  
+
   const hasCardSaved = !!subscription.card_last_digits;
 
   return (
@@ -186,7 +185,7 @@ export function ManageSubscription() {
                 {PLAN_NAMES[subscription.plan_type] || subscription.plan_type}
               </p>
             </div>
-            
+
             {!isTrial && (
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Ciclo de cobrança</p>
@@ -278,7 +277,7 @@ export function ManageSubscription() {
                   {format(new Date(subscription.trial_ends_at), "dd 'de' MMMM", { locale: ptBR })}
                 </strong>
                 . Escolha um plano para continuar usando.{" "}
-                <a 
+                <a
                   href="https://crm-appi-company.lovable.app/suporte-publico"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -296,7 +295,7 @@ export function ManageSubscription() {
             <Button variant="outline" onClick={() => window.location.href = "/plans"}>
               {isTrial ? "Escolher Plano" : "Mudar Plano"}
             </Button>
-            
+
             {!isTrial && subscription.status !== "cancelled" && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -308,8 +307,8 @@ export function ManageSubscription() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Cancelar assinatura?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Ao cancelar, a renovação automática será desativada. Você ainda terá acesso ao plano 
-                      até o fim do período atual ({subscription.current_period_end && 
+                      Ao cancelar, a renovação automática será desativada. Você ainda terá acesso ao plano
+                      até o fim do período atual ({subscription.current_period_end &&
                         format(new Date(subscription.current_period_end), "dd/MM/yyyy")}).
                     </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -337,9 +336,6 @@ export function ManageSubscription() {
         </CardContent>
       </Card>
 
-      {/* Referral Section */}
-      <ReferralSection />
-
       {/* Payment History */}
       {payments && payments.length > 0 && (
         <Card>
@@ -355,8 +351,8 @@ export function ManageSubscription() {
                 >
                   <div className="space-y-1">
                     <p className="font-medium text-sm">
-                      {payment.plan_type === "connection" 
-                        ? "Conexão Extra" 
+                      {payment.plan_type === "connection"
+                        ? "Conexão Extra"
                         : `Plano ${PLAN_NAMES[payment.plan_type] || payment.plan_type}`}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -374,16 +370,16 @@ export function ManageSubscription() {
                         payment.status === "CONFIRMED" || payment.status === "RECEIVED"
                           ? "default"
                           : payment.status === "PENDING"
-                          ? "secondary"
-                          : "destructive"
+                            ? "secondary"
+                            : "destructive"
                       }
                       className="text-xs"
                     >
                       {payment.status === "CONFIRMED" || payment.status === "RECEIVED"
                         ? "Pago"
                         : payment.status === "PENDING"
-                        ? "Pendente"
-                        : payment.status}
+                          ? "Pendente"
+                          : payment.status}
                     </Badge>
                   </div>
                 </div>

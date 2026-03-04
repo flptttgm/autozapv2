@@ -772,6 +772,31 @@ All colors MUST be HSL.
   animation: ai-message-in 0.25s ease-out forwards;
 }
 
+/* AI Typing dots with gradient */
+@keyframes ai-typing-bounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.ai-typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  animation: ai-typing-bounce 1.2s ease-in-out infinite;
+}
+
 /* Hover effect no icone do header */
 .ai-icon-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;

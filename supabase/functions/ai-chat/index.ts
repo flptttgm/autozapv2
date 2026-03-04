@@ -6,6 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Model whitelist with provider routing
+// All use AI_API_KEY — OpenAI key for GPT models, Google API key for Gemini models
+const MODEL_CONFIG: Record<string, { provider: 'google' | 'openai'; modelId: string; label: string }> = {
+  'gemini-2.5-flash': { provider: 'google', modelId: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  'gemini-2.5-pro': { provider: 'google', modelId: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  'gpt-4o-mini': { provider: 'openai', modelId: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  'gpt-4o': { provider: 'openai', modelId: 'gpt-4o', label: 'GPT-4o' },
+};
+
+const DEFAULT_MODEL = 'gpt-4o-mini';
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -38,14 +49,21 @@ serve(async (req) => {
 
     console.log(`AI chat request from user: ${user.id}`);
 
-    const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const { messages, model: requestedModel } = await req.json();
+
+    // Resolve model configuration
+    const modelKey = requestedModel && MODEL_CONFIG[requestedModel] ? requestedModel : DEFAULT_MODEL;
+    const modelConfig = MODEL_CONFIG[modelKey];
+
+    // API key — AI_API_KEY is our main key (OpenAI)
+    const aiApiKey = Deno.env.get("AI_API_KEY") || '';
+    if (!aiApiKey) {
+      throw new Error("AI_API_KEY is not configured");
     }
 
-  const systemPrompt = `
+    console.log(`Using model: ${modelConfig.label} (${modelConfig.modelId}) via ${modelConfig.provider}`);
+
+    const systemPrompt = `
 ## 🔴 REGRAS INVIOLÁVEIS (PRIORIDADE MÁXIMA)
 
 1. "Automações" (em Agentes) = APENAS boas-vindas em grupos WhatsApp
@@ -113,46 +131,138 @@ O AutoZap utiliza RAG (Retrieval-Augmented Generation) para respostas precisas:
 
 Responda em português brasileiro, seja objetivo e use nomes exatos de menus/botões.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
+    // ─── Route to the correct API ───────────────────
+    let response: Response;
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (modelConfig.provider === 'google') {
+      // Google Gemini — direct streaming via generateContent with streamGenerateContent
+      const geminiMessages = [];
+
+      // System instruction handled separately in Gemini API
+      const contents = messages.map((m: { role: string; content: string }) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
+
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.modelId}:streamGenerateContent?alt=sse&key=${aiApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: {
+              maxOutputTokens: 2048,
+              temperature: 0.7,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini API error:", response.status, errorText);
+
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ error: "Erro ao processar sua mensagem." }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione créditos ao workspace." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+      // Transform Gemini SSE stream to OpenAI-compatible SSE stream
+      // so the frontend parser works unchanged
+      const geminiStream = response.body!;
+      const transformedStream = new ReadableStream({
+        async start(controller) {
+          const reader = geminiStream.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+
+              let newlineIndex;
+              while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                let line = buffer.slice(0, newlineIndex);
+                buffer = buffer.slice(newlineIndex + 1);
+
+                if (line.endsWith('\r')) line = line.slice(0, -1);
+                if (!line.startsWith('data: ')) continue;
+
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (text) {
+                    // Emit in OpenAI SSE format
+                    const openaiChunk = JSON.stringify({
+                      choices: [{ delta: { content: text } }]
+                    });
+                    controller.enqueue(new TextEncoder().encode(`data: ${openaiChunk}\n\n`));
+                  }
+                } catch { /* skip malformed */ }
+              }
+            }
+
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          } catch (err) {
+            controller.error(err);
+          }
+        }
+      });
+
+      return new Response(transformedStream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+
+    } else {
+      // OpenAI — standard streaming
+      response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${aiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelConfig.modelId,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages,
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const errorText = await response.text();
+        console.error("OpenAI API error:", response.status, errorText);
+        return new Response(JSON.stringify({ error: "Erro ao processar sua mensagem." }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: "Erro ao processar sua mensagem." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+      return new Response(response.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
   } catch (error) {
     console.error("AI chat error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido" }), {

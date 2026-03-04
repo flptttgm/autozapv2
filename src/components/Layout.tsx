@@ -1,9 +1,10 @@
 import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, BrainCog, X, PanelLeftClose, Building2 } from "lucide-react";
+import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, X, PanelLeftClose, Building2 } from "lucide-react";
 import { MdSupportAgent, MdCast, MdCastConnected, MdDashboard, MdOutlineAppRegistration } from "react-icons/md";
 import { HiOutlineGift } from "react-icons/hi";
+import { RiRobot2Fill } from "react-icons/ri";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -56,8 +57,18 @@ const Layout = ({ children }: LayoutProps) => {
     localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ai-chat-open') === 'true';
+    }
+    return false;
+  });
   const [supportChatOpen, setSupportChatOpen] = useState(false);
+
+  // Persist AI chat state
+  useEffect(() => {
+    localStorage.setItem('ai-chat-open', String(aiChatOpen));
+  }, [aiChatOpen]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Reset sidebar on route change
@@ -103,7 +114,7 @@ const Layout = ({ children }: LayoutProps) => {
     { name: "Conexões", href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast },
   ];
 
-  const agentsNav = { name: "Agentes", href: "/ai-settings", icon: BrainCog };
+  const agentsNav = { name: "Agentes", href: "/ai-settings", icon: RiRobot2Fill };
 
   const systemNav = [
     { name: "Configurações", href: "/settings", icon: Settings },
@@ -434,45 +445,54 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
           </aside>
 
-          {/* Main Content */}
-          <main
-            className="flex-1 flex flex-col transition-all duration-300 min-h-0"
-          >
-            {/* Header - hidden on mobile */}
-            {!isMobile && (
-              <DashboardHeader
-                onToggleAIChat={() => setAiChatOpen(!aiChatOpen)}
-                aiChatOpen={aiChatOpen}
-                onToggleMobileSidebar={() => setSidebarOpen(!sidebarOpen)}
-                sidebarCollapsed={sidebarCollapsed}
-              />
-            )}
-
-            {/* Mobile Header - apenas páginas internas (não dashboard) */}
-            {isMobile && location.pathname !== '/' && location.pathname !== '/dashboard' && (
-              <div className="flex items-center justify-end px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <Logo size="sm" />
-              </div>
-            )}
-            <div
-              ref={scrollContainerRef}
-              data-main-scroll
-              className={cn(
-                "flex-1 min-h-0",
-                "overflow-y-auto overflow-x-hidden",
-              )}
-              style={{
-                maxWidth: '100vw',
-                boxSizing: 'border-box',
-              }}
+          {/* Main Content + AI Sidebar flex layout */}
+          <div className="flex-1 flex min-h-0 min-w-0">
+            <main
+              className="flex-1 flex flex-col transition-all duration-300 min-h-0 min-w-0"
             >
-              {children}
-              {/* Spacer para mobile - páginas com altura fixa (conversations, appointments) gerenciam seu próprio layout */}
-              {isMobile && !location.pathname.startsWith('/conversations') && (
-                <div className="h-40 shrink-0" aria-hidden="true" />
+              {/* Header - hidden on mobile */}
+              {!isMobile && (
+                <DashboardHeader
+                  onToggleAIChat={() => setAiChatOpen(!aiChatOpen)}
+                  aiChatOpen={aiChatOpen}
+                  onToggleMobileSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  sidebarCollapsed={sidebarCollapsed}
+                />
               )}
-            </div>
-          </main>
+
+              {/* Mobile Header - apenas páginas internas (não dashboard) */}
+              {isMobile && location.pathname !== '/' && location.pathname !== '/dashboard' && (
+                <div className="flex items-center justify-end px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                  <Logo size="sm" />
+                </div>
+              )}
+              <div
+                ref={scrollContainerRef}
+                data-main-scroll
+                className={cn(
+                  "flex-1 min-h-0",
+                  "overflow-y-auto overflow-x-hidden",
+                )}
+                style={{
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {children}
+                {/* Spacer para mobile - páginas com altura fixa (conversations, appointments) gerenciam seu próprio layout */}
+                {isMobile && !location.pathname.startsWith('/conversations') && (
+                  <div className="h-40 shrink-0" aria-hidden="true" />
+                )}
+              </div>
+            </main>
+
+            {/* AI Chat Sidebar - inline on desktop (push), overlay on mobile/conversations */}
+            <AIChatSidebar
+              isOpen={aiChatOpen}
+              onClose={() => setAiChatOpen(false)}
+              isOverlay={isMobile || location.pathname.startsWith('/conversations')}
+            />
+          </div>
 
           {/* Mobile Bottom Navigation */}
           <MobileBottomNav
@@ -483,9 +503,6 @@ const Layout = ({ children }: LayoutProps) => {
               quotes: isQuotesVisible
             }}
           />
-
-          {/* AI Chat Sidebar */}
-          <AIChatSidebar isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
 
           {/* Support Chat Sidebar */}
           <SupportChatSidebar isOpen={supportChatOpen} onClose={() => setSupportChatOpen(false)} />

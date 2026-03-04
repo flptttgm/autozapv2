@@ -71,8 +71,15 @@ serve(async (req: Request) => {
         content = payload.video.caption || '[Vídeo 🎬]';
         messageType = 'video';
       } else if (payload.document) {
-        content = payload.document.fileName || '[Documento 📄]';
-        messageType = 'document';
+        // Check if document is actually a video by mime type
+        const docMime = (payload.document.mimeType || '').toLowerCase();
+        if (docMime.startsWith('video/')) {
+          content = payload.document.caption || payload.document.fileName || '[Vídeo 🎬]';
+          messageType = 'video';
+        } else {
+          content = payload.document.fileName || '[Documento 📄]';
+          messageType = 'document';
+        }
       } else if (payload.sticker) {
         content = '[Figurinha]';
         messageType = 'sticker';
@@ -434,13 +441,83 @@ serve(async (req: Request) => {
             console.log('[zapi-webhook] 🛑 Anti-Loop: Rapid-fire short messages detected, skipping AI');
           }
         }
-      }
 
-      if (shouldSkipAI) {
-        await supabaseDebug.from('debug_logs').insert({ data: { step: 'anti_loop_skip', chat_id: phone } });
-        return new Response(JSON.stringify({ success: true, skipped: 'anti_loop' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        // Check 4: Repetitive content loop — if outbound messages keep repeating similar content
+        if (!shouldSkipAI) {
+          // Helper: extract key words from a message for comparison
+          const getWords = (text: string) => {
+            if (!text) return new Set<string>();
+            return new Set(
+              text.toLowerCase()
+                .replace(/[^\w\sáàâãéèêíìîóòôõúùûçñ]/g, '')
+                .split(/\s+/)
+                .filter(w => w.length > 3)
+            );
+          };
+
+          // Helper: Jaccard similarity between two word sets
+          const similarity = (a: Set<string>, b: Set<string>) => {
+            if (a.size === 0 || b.size === 0) return 0;
+            let intersection = 0;
+            for (const word of a) { if (b.has(word)) intersection++; }
+            return intersection / (a.size + b.size - intersection);
+          };
+
+          const outboundMsgs = msgs.filter(m => m.direction === 'outbound' && m.content?.length > 15);
+          const inboundMsgs = msgs.filter(m => m.direction === 'inbound' && m.content?.length > 15);
+
+          // If we have 2+ outbound messages that are very similar to each other
+          if (outboundMsgs.length >= 2) {
+            const lastOut = getWords(outboundMsgs[outboundMsgs.length - 1].content);
+            const prevOut = getWords(outboundMsgs[outboundMsgs.length - 2].content);
+            const outSim = similarity(lastOut, prevOut);
+
+            if (outSim > 0.6) {
+              // And inbound messages are also similar (AI-to-AI loop)
+              if (inboundMsgs.length >= 2) {
+                const lastIn = getWords(inboundMsgs[inboundMsgs.length - 1].content);
+                const prevIn = getWords(inboundMsgs[inboundMsgs.length - 2].content);
+                const inSim = similarity(lastIn, prevIn);
+
+                if (inSim > 0.6) {
+                  shouldSkipAI = true;
+                  console.log(`[zapi-webhook] 🛑 Anti-Loop: Repetitive content detected (out:${outSim.toFixed(2)}, in:${inSim.toFixed(2)}), skipping AI`);
+                }
+              }
+
+              // Or if the last outbound and last inbound are also very similar (echo loop)
+              if (!shouldSkipAI && inboundMsgs.length >= 1) {
+                const lastIn = getWords(inboundMsgs[inboundMsgs.length - 1].content);
+                const crossSim = similarity(lastOut, lastIn);
+                if (crossSim > 0.6) {
+                  shouldSkipAI = true;
+                  console.log(`[zapi-webhook] 🛑 Anti-Loop: Cross-echo loop detected (sim:${crossSim.toFixed(2)}), skipping AI`);
+                }
+              }
+            }
+          }
+        }
+
+        // Check 5: Strict alternating pattern — 6+ messages strictly alternating directions within 5 min
+        if (!shouldSkipAI && recentMsgs.length >= 6) {
+          const last6 = msgs.slice(-6);
+          const isAlternating = last6.every((m, i) => i === 0 || m.direction !== last6[i - 1].direction);
+          if (isAlternating) {
+            const newest6 = new Date(last6[last6.length - 1].created_at).getTime();
+            const oldest6 = new Date(last6[0].created_at).getTime();
+            if (newest6 - oldest6 < 5 * 60 * 1000) {
+              shouldSkipAI = true;
+              console.log('[zapi-webhook] 🛑 Anti-Loop: Strict alternating 6-message pattern in <5min, skipping AI');
+            }
+          }
+        }
+
+        if (shouldSkipAI) {
+          await supabaseDebug.from('debug_logs').insert({ data: { step: 'anti_loop_skip', chat_id: phone } });
+          return new Response(JSON.stringify({ success: true, skipped: 'anti_loop' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
 
       // 5. Trigger AI Process (with optional message buffer)

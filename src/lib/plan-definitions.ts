@@ -26,7 +26,7 @@ export const PLAN_MEMBER_LIMITS = {
   trial: 1,
   start: 3,
   pro: 10,
-  business: 50,
+  business: 30,
 };
 
 // Features que TODOS os planos têm (Start, Pro, Business)

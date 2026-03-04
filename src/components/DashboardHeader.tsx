@@ -140,7 +140,7 @@ const ThemeToggle = () => {
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="text-xs">
-        {isDark ? "Modo claro" : "Modo escuro"}
+        {isDark ? "Modo escuro" : "Modo claro"}
       </TooltipContent>
     </Tooltip>
   );

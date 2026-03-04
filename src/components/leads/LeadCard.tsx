@@ -136,7 +136,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
 
           {/* Avatar */}
           <Avatar className={cn(
-            "h-12 w-12 shrink-0",
+            "h-[61px] w-[61px] shrink-0",
             "ring-2 ring-border/50 group-hover:ring-primary/30",
             "transition-all duration-300",
             isSelected && "ring-primary/50"
@@ -218,7 +218,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
         </div>
 
         {/* Contact info - indented to align with name */}
-        <div className="mt-3 ml-16 space-y-1.5">
+        <div className="mt-3 ml-[78px] space-y-1.5">
           {!isGroup && lead.phone && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Phone className="h-4 w-4 shrink-0" />
@@ -239,7 +239,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
         </div>
 
         {/* Footer with date + AI toggle */}
-        <div className="mt-4 pt-3 border-t border-border/50 ml-16 flex items-center justify-between">
+        <div className="mt-4 pt-3 border-t border-border/50 ml-[78px] flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
             <Calendar className="h-4 w-4" />
             <span>{formattedDate}</span>

@@ -73,7 +73,12 @@ const features = [
 export default function Auth() {
   const { user, profile, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
-  const [isLogin, setIsLogin] = useState(searchParams.get("mode") === "login");
+  const [isLogin, setIsLogin] = useState(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "login") return true;
+    if (mode === "signup") return false;
+    return localStorage.getItem("has_logged_in_before") === "true";
+  });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);

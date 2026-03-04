@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,23 +26,47 @@ export function PDFPreviewDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [useDirectUrl, setUseDirectUrl] = useState(false);
 
-  const loadPdf = async () => {
-    if (blobUrl) return; // Already loaded
-    
-    try {
-      setIsLoading(true);
-      const response = await fetch(pdfUrl);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setBlobUrl(url);
-    } catch (error) {
-      toast.error("Erro ao carregar PDF");
-      onOpenChange(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    let active = true;
+
+    const loadPdf = async () => {
+      if (!open || !pdfUrl) return;
+
+      try {
+        setIsLoading(true);
+        setUseDirectUrl(false);
+        const response = await fetch(pdfUrl);
+        if (!active) return;
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch PDF");
+        }
+
+        const blob = await response.blob();
+        if (!active) return;
+
+        const url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+      } catch (error) {
+        if (!active) return;
+        console.warn("Could not fetch PDF for preview as Blob (CORS?), falling back to direct URL in iframe.", error);
+        // Fallback to direct URL if fetch (CORS) fails
+        setUseDirectUrl(true);
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadPdf();
+
+    return () => {
+      active = false;
+    };
+  }, [open, pdfUrl]);
 
   const handleDownload = async () => {
     try {
@@ -50,18 +74,18 @@ export function PDFPreviewDialog({
       const response = blobUrl ? null : await fetch(pdfUrl);
       const blob = blobUrl ? null : await response?.blob();
       const downloadUrl = blobUrl || (blob ? URL.createObjectURL(blob) : pdfUrl);
-      
+
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       if (!blobUrl && blob) {
         URL.revokeObjectURL(downloadUrl);
       }
-      
+
       toast.success("Download iniciado!");
     } catch (error) {
       toast.error("Erro ao baixar PDF");
@@ -69,24 +93,24 @@ export function PDFPreviewDialog({
   };
 
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen && blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-      setBlobUrl(null);
+    if (!newOpen) {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        setBlobUrl(null);
+      }
       setIsLoading(true);
+      setUseDirectUrl(false);
     }
     setIsFullscreen(false);
     onOpenChange(newOpen);
   };
 
-  // Load PDF when dialog opens
-  if (open && !blobUrl && isLoading) {
-    loadPdf();
-  }
+  const iframeSrc = useDirectUrl ? pdfUrl : blobUrl;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent 
-        className={`${isFullscreen ? 'max-w-[95vw] w-[95vw] h-[95vh] max-h-[95vh]' : 'max-w-4xl w-full h-[80vh] max-h-[80vh]'} flex flex-col p-0 gap-0 transition-all duration-200`}
+      <DialogContent
+        className={`${isFullscreen ? 'max-w-[95vw] w-[95vw] h-[95vh] max-h-[95vh]' : 'max-w-4xl w-full h-[80vh] max-h-[80vh]'} [&>button]:hidden flex flex-col p-0 gap-0 transition-all duration-200`}
       >
         <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -125,7 +149,7 @@ export function PDFPreviewDialog({
             </div>
           </div>
         </DialogHeader>
-        
+
         <div className="flex-1 overflow-hidden bg-muted/30">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -134,9 +158,9 @@ export function PDFPreviewDialog({
                 <span className="text-sm text-muted-foreground">Carregando PDF...</span>
               </div>
             </div>
-          ) : blobUrl ? (
+          ) : iframeSrc ? (
             <iframe
-              src={blobUrl}
+              src={iframeSrc}
               className="w-full h-full border-0"
               title={fileName}
             />
