@@ -3,6 +3,7 @@ import { TimezoneSelector } from "./TimezoneSelector";
 import { SidebarPagesVisibility } from "./SidebarPagesVisibility";
 import { AdminPhoneSettings } from "./AdminPhoneSettings";
 import { ThemeSelector } from "./ThemeSelector";
+import { AgendaSettings } from "./AgendaSettings";
 
 export const GeneralSettings = () => {
 
@@ -11,6 +12,8 @@ export const GeneralSettings = () => {
       <AdminPhoneSettings />
 
       <ThemeSelector />
+
+      <AgendaSettings />
 
       <TimezoneSelector />
 

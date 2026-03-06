@@ -1,6 +1,6 @@
 import { memo, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import { AppleEmojiText } from "./apple-emoji-text";
+import { AppleEmojiText, segmenter, IS_EMOJI_REGEX } from "./apple-emoji-text";
 
 interface MarkdownWithAppleEmojiProps {
   content: string;
@@ -37,10 +37,28 @@ function renderChildrenWithEmoji(children: ReactNode, emojiSize: number): ReactN
 export const MarkdownWithAppleEmoji = memo(function MarkdownWithAppleEmoji({
   content,
   className = "",
-  emojiSize = 18
+  emojiSize = 22 // Updated base size to 22 globally
 }: MarkdownWithAppleEmojiProps) {
   // Pre-process: convert raw URLs to markdown links
   const processedContent = linkifyContent(content);
+
+  // Check if the message is purely emojis to apply Jumbo sizes
+  let effectiveEmojiSize = emojiSize;
+
+  if (content) {
+    const segments = Array.from(segmenter.segment(content.trim())).map((s: any) => s.segment);
+    const emojiSegments = segments.filter((seg) => IS_EMOJI_REGEX.test(seg));
+    const nonEmojiTextSegments = segments.filter((seg) => !IS_EMOJI_REGEX.test(seg) && seg.trim().length > 0);
+
+    // If the message consists exclusively of emojis (ignoring whitespace)
+    if (nonEmojiTextSegments.length === 0 && emojiSegments.length > 0) {
+      if (emojiSegments.length === 1) {
+        effectiveEmojiSize = emojiSize * 2.5; // Jumbo emoji (1 emoji)
+      } else {
+        effectiveEmojiSize = emojiSize * 1.5; // 50% larger (2+ emojis)
+      }
+    }
+  }
 
   return (
     <div className={className}>
@@ -49,22 +67,22 @@ export const MarkdownWithAppleEmoji = memo(function MarkdownWithAppleEmoji({
           // Override text rendering to use Apple emojis
           p: ({ children }) => (
             <p className="mb-1 last:mb-0">
-              {renderChildrenWithEmoji(children, emojiSize)}
+              {renderChildrenWithEmoji(children, effectiveEmojiSize)}
             </p>
           ),
           li: ({ children }) => (
             <li className="mb-0.5">
-              {renderChildrenWithEmoji(children, emojiSize)}
+              {renderChildrenWithEmoji(children, effectiveEmojiSize)}
             </li>
           ),
           strong: ({ children }) => (
             <strong className="font-semibold">
-              {renderChildrenWithEmoji(children, emojiSize)}
+              {renderChildrenWithEmoji(children, effectiveEmojiSize)}
             </strong>
           ),
           em: ({ children }) => (
             <em className="italic">
-              {renderChildrenWithEmoji(children, emojiSize)}
+              {renderChildrenWithEmoji(children, effectiveEmojiSize)}
             </em>
           ),
           // Links open in new tab
@@ -75,7 +93,7 @@ export const MarkdownWithAppleEmoji = memo(function MarkdownWithAppleEmoji({
               rel="noopener noreferrer"
               className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline underline-offset-2 break-all"
             >
-              {renderChildrenWithEmoji(children, emojiSize)}
+              {renderChildrenWithEmoji(children, effectiveEmojiSize)}
             </a>
           ),
           // Pass through other elements

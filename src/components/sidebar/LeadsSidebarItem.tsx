@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTerminology } from "@/hooks/useTerminology";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { MdGroupAdd } from "react-icons/md";
+import { useTranslation } from "react-i18next";
 
 interface LeadsSidebarItemProps {
   collapsed: boolean;
@@ -21,6 +22,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
   const { terminology } = useTerminology();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
 
@@ -82,7 +84,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
   };
 
   const formatPhone = (phone: string | null) => {
-    if (!phone) return "Sem número";
+    if (!phone) return t("sidebar.noNumber");
     return phone.replace(/^55/, "+55 ");
   };
 
@@ -202,7 +204,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
           )}
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">Prospectar</span>
+          <span className="flex-1">{t("sidebar.prospect")}</span>
         </Link>
 
         {/* All leads */}
@@ -215,7 +217,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
               : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
           )}
         >
-          <span className="flex-1">Todos</span>
+          <span className="flex-1">{t("sidebar.allMale")}</span>
           {totalLeads > 0 && (
             <span className="text-xs text-muted-foreground">({totalLeads})</span>
           )}
@@ -255,7 +257,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
 
         {(!instances || instances.length === 0) && (
           <div className="px-3 py-1.5 text-xs text-muted-foreground italic">
-            Nenhuma instância conectada
+            {t("sidebar.noConnectedInstance")}
           </div>
         )}
       </CollapsibleContent>

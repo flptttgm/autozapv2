@@ -17,7 +17,8 @@ import { formatPhoneDisplay, detectPhoneCountry } from "@/lib/phone";
 import { AIToggle } from "./AIToggle";
 import { LeadProgressBar, calculateLeadProgress } from "./LeadProgressBar";
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { ptBR, enUS } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 interface Lead {
   id: string;
@@ -45,49 +46,21 @@ interface LeadsTableProps {
   someSelected?: boolean;
 }
 
-const STATUS_CONFIG = {
-  new: {
-    label: "NOVO",
-    bg: "bg-sky-500/20",
-    text: "text-sky-300",
-  },
-  contacted: {
-    label: "CONTATADO",
-    bg: "bg-amber-500/20",
-    text: "text-amber-300",
-  },
-  qualified: {
-    label: "QUALIFICADO",
-    bg: "bg-violet-500/20",
-    text: "text-violet-300",
-  },
-  proposal: {
-    label: "PROPOSTA",
-    bg: "bg-cyan-500/20",
-    text: "text-cyan-300",
-  },
-  negotiation: {
-    label: "NEGOCIAÇÃO",
-    bg: "bg-orange-500/20",
-    text: "text-orange-300",
-  },
-  won: {
-    label: "FECHADO",
-    bg: "bg-emerald-500/20",
-    text: "text-emerald-300",
-  },
-  lost: {
-    label: "PERDIDO",
-    bg: "bg-rose-500/20",
-    text: "text-rose-300",
-  },
-};
+const getStatusConfig = (t: any) => ({
+  new: { label: t("statusNewUpper"), bg: "bg-sky-500/20", text: "text-sky-300" },
+  contacted: { label: t("statusContactedUpper"), bg: "bg-amber-500/20", text: "text-amber-300" },
+  qualified: { label: t("statusQualifiedUpper"), bg: "bg-violet-500/20", text: "text-violet-300" },
+  proposal: { label: t("statusProposalUpper"), bg: "bg-cyan-500/20", text: "text-cyan-300" },
+  negotiation: { label: t("statusNegotiationUpper"), bg: "bg-orange-500/20", text: "text-orange-300" },
+  won: { label: t("statusWonUpper"), bg: "bg-emerald-500/20", text: "text-emerald-300" },
+  lost: { label: t("statusLostUpper"), bg: "bg-rose-500/20", text: "text-rose-300" },
+});
 
-const getScoreConfig = (score: number) => {
-  if (score >= 80) return { label: "Quente", emoji: "🔥", color: "text-emerald-500", bg: "bg-emerald-500", bgLight: "bg-emerald-500/15" };
-  if (score >= 50) return { label: "Morno", emoji: "☀️", color: "text-amber-500", bg: "bg-amber-500", bgLight: "bg-amber-500/15" };
-  if (score >= 25) return { label: "Frio", emoji: "🌤️", color: "text-orange-500", bg: "bg-orange-500", bgLight: "bg-orange-500/15" };
-  return { label: "Gelado", emoji: "❄️", color: "text-red-400", bg: "bg-red-400", bgLight: "bg-red-400/15" };
+const getScoreConfig = (score: number, t: any) => {
+  if (score >= 80) return { label: t("scoreHot"), emoji: "🔥", color: "text-emerald-500", bg: "bg-emerald-500", bgLight: "bg-emerald-500/15" };
+  if (score >= 50) return { label: t("scoreWarm"), emoji: "☀️", color: "text-amber-500", bg: "bg-amber-500", bgLight: "bg-amber-500/15" };
+  if (score >= 25) return { label: t("scoreCold"), emoji: "🌤️", color: "text-orange-500", bg: "bg-orange-500", bgLight: "bg-orange-500/15" };
+  return { label: t("scoreFreezing"), emoji: "❄️", color: "text-red-400", bg: "bg-red-400", bgLight: "bg-red-400/15" };
 };
 
 export const LeadsTable = ({
@@ -101,6 +74,7 @@ export const LeadsTable = ({
   someSelected,
 }: LeadsTableProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("leads");
 
   const handleRowClick = (leadId: string) => {
     if (isSelectionMode) {
@@ -120,7 +94,7 @@ export const LeadsTable = ({
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={onSelectAll}
-                  aria-label="Selecionar todos"
+                  aria-label={t("selectAllAria")}
                   className={cn(
                     "h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary",
                     someSelected && !allSelected && "border-primary/50",
@@ -129,25 +103,25 @@ export const LeadsTable = ({
               </TableHead>
             )}
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Cliente
+              {t("client")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">
-              Contato
+              {t("contact")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider w-32 xl:w-40">
-              Progresso
+              {t("progress")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">
-              Status
+              {t("status")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center w-24">
-              Score
+              {t("score")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">
-              Última Interação
+              {t("lastInteraction")}
             </TableHead>
             <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center w-20">
-              IA
+              {t("ai")}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -183,8 +157,11 @@ const LeadTableRow = ({
   onSelect,
   onClick,
 }: LeadTableRowProps) => {
+  const { t, i18n } = useTranslation("leads");
+  const STATUS_CONFIG = getStatusConfig(t);
+
   const [imageError, setImageError] = useState(false);
-  const displayName = (lead.name || "Sem nome").replace(/^Grupo:\s*/i, "");
+  const displayName = (lead.name || t("noName")).replace(/^Grupo:\s*/i, "");
   const initials = displayName
     .split(" ")
     .slice(0, 2)
@@ -202,7 +179,7 @@ const LeadTableRow = ({
   const createdAt = lead.created_at
     ? formatDistanceToNow(new Date(lead.created_at), {
       addSuffix: true,
-      locale: ptBR,
+      locale: i18n.language === 'pt' ? ptBR : enUS,
     })
     : "";
 
@@ -279,7 +256,7 @@ const LeadTableRow = ({
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">
-              Adicionado {createdAt}
+              {t("addedDate", { date: createdAt })}
             </p>
             {/* Show phone on smaller screens where contact column is hidden */}
             {!isGroup && lead.phone && (
@@ -342,7 +319,7 @@ const LeadTableRow = ({
       <TableCell className="py-4">
         {lead.score != null && lead.score > 0 ? (
           (() => {
-            const config = getScoreConfig(lead.score);
+            const config = getScoreConfig(lead.score, t);
             return (
               <div className="flex flex-col gap-1.5 min-w-[70px]">
                 <div className="flex items-center justify-between">

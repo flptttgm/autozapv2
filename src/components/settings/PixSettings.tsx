@@ -58,7 +58,7 @@ export function PixSettings() {
     queryKey: ["pix-config", profile?.workspace_id],
     queryFn: async () => {
       if (!profile?.workspace_id) return null;
-      
+
       const { data, error } = await supabase
         .from("pix_config")
         .select("*")
@@ -66,7 +66,7 @@ export function PixSettings() {
         .maybeSingle();
 
       if (error) throw error;
-      
+
       if (data) {
         setFormData({
           pix_key: data.pix_key,
@@ -76,7 +76,7 @@ export function PixSettings() {
           is_active: data.is_active,
         });
       }
-      
+
       return data as PixConfig | null;
     },
     enabled: !!profile?.workspace_id,

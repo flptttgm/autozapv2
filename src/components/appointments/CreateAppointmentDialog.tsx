@@ -47,7 +47,7 @@ export const CreateAppointmentDialog = ({
   initialDate,
   selectedInstance,
 }: CreateAppointmentDialogProps) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { terminology } = useTerminology();
   const { logChange } = useAuditLog();
   const queryClient = useQueryClient();
@@ -67,19 +67,7 @@ export const CreateAppointmentDialog = ({
     }
   }, [open, initialDate]);
 
-  const { data: workspaceId } = useQuery({
-    queryKey: ["user-workspace-id"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("workspace_id")
-        .eq("id", user?.id)
-        .single();
-      if (error) throw error;
-      return data?.workspace_id;
-    },
-    enabled: !!user?.id,
-  });
+  const workspaceId = profile?.workspace_id;
 
   const { data: leads } = useQuery({
     queryKey: ["leads-for-appointments", workspaceId, selectedInstance],
@@ -91,12 +79,12 @@ export const CreateAppointmentDialog = ({
         .select("id, name, phone, whatsapp_instance_id")
         .eq("workspace_id", workspaceId)
         .order("name", { ascending: true });
-      
+
       // Filter by instance if selected
       if (selectedInstance) {
         query = query.eq("whatsapp_instance_id", selectedInstance);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -109,13 +97,13 @@ export const CreateAppointmentDialog = ({
     queryKey: ["day-appointments", workspaceId, date?.toDateString()],
     queryFn: async () => {
       if (!date || !workspaceId) return [];
-      
+
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
-      
+
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
-      
+
       const { data, error } = await supabase
         .from("appointments")
         .select("id, title, start_time, end_time, lead_id, leads(name, phone)")
@@ -124,7 +112,7 @@ export const CreateAppointmentDialog = ({
         .gte("start_time", startOfDay.toISOString())
         .lte("start_time", endOfDay.toISOString())
         .order("start_time", { ascending: true });
-      
+
       if (error) throw error;
       return data;
     },
@@ -150,13 +138,18 @@ export const CreateAppointmentDialog = ({
       }
 
       // Check for conflicting appointments
-      const { data: conflicts } = await supabase
+      const { data: conflicts, error: checkError } = await supabase
         .from("appointments")
         .select("id, title, start_time, end_time")
         .eq("workspace_id", workspaceId)
         .neq("status", "cancelled")
-        .or(`and(start_time.lt.${endDateTime.toISOString()},end_time.gt.${startDateTime.toISOString()})`)
+        .lt("start_time", endDateTime.toISOString())
+        .gt("end_time", startDateTime.toISOString())
         .limit(1);
+
+      if (checkError) {
+        console.error("Conflict check error:", checkError);
+      }
 
       if (conflicts && conflicts.length > 0) {
         const conflict = conflicts[0];
@@ -174,8 +167,6 @@ export const CreateAppointmentDialog = ({
         lead_id: leadId || null,
         workspace_id: workspaceId,
         status: "scheduled",
-        source: "manual",
-        created_by: user?.id || null,
       });
 
       if (error) throw error;
@@ -196,8 +187,9 @@ export const CreateAppointmentDialog = ({
       resetForm();
       onOpenChange(false);
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Erro ao criar agendamento");
+    onError: (error: any) => {
+      console.error("Mutation create erro:", error);
+      toast.error(error?.message || "Erro ao criar agendamento");
     },
   });
 
@@ -212,34 +204,84 @@ export const CreateAppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Novo Agendamento</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-[95vw] sm:max-w-lg p-0 overflow-hidden border-border/50 max-h-[90vh] overflow-y-auto">
+        {/* Premium gradient header */}
+        <div className="relative px-6 pt-6 pb-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+          <DialogHeader className="relative">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-sm">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="text-lg font-semibold">Novo Agendamento</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Preencha os detalhes do compromisso
+                </p>
+              </div>
+            </div>
+            {/* Action buttons in header */}
+            <div className="flex gap-2 mt-4 pt-4 border-t border-border/30">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-9"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 h-9 gap-1.5 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20"
+                onClick={() => createMutation.mutate()}
+                disabled={createMutation.isPending || !title.trim() || !date}
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    Criar Agendamento
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogHeader>
+        </div>
 
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="title">Título *</Label>
+        <div className="px-6 pb-6 space-y-5">
+          {/* Título */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+              Título *
+            </Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Consulta, Reunião..."
+              className="h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:bg-background transition-colors"
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label>Data *</Label>
+          {/* Data */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+              Data *
+            </Label>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal h-11 bg-muted/30 border-border/50 hover:bg-muted/50 transition-colors",
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                   {date ? format(date, "PPP", { locale: ptBR }) : "Selecione uma data"}
                 </Button>
               </PopoverTrigger>
@@ -258,36 +300,37 @@ export const CreateAppointmentDialog = ({
               </PopoverContent>
             </Popover>
 
-            {/* Show occupied time slots for selected date */}
+            {/* Occupied time slots - premium style */}
             {date && (
-              <div className="mt-2 rounded-md border border-border bg-muted/30 p-3 overflow-hidden">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                  <Clock className="h-4 w-4 shrink-0" />
-                  <span>Horários ocupados neste dia:</span>
+              <div className="rounded-xl border border-border/40 bg-gradient-to-b from-muted/20 to-muted/40 p-3 overflow-hidden">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2.5">
+                  <div className="h-6 w-6 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                  </div>
+                  <span>Horários ocupados</span>
                 </div>
-                
+
                 {loadingDayAppts ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span>Carregando...</span>
                   </div>
                 ) : dayAppointments && dayAppointments.length > 0 ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 max-h-28 overflow-y-auto">
                     {dayAppointments.map((apt) => {
-                      const startTime = format(new Date(apt.start_time), "HH:mm");
-                      const endTime = format(new Date(apt.end_time), "HH:mm");
-                      const leadName = apt.leads?.name || apt.leads?.phone;
-                      
+                      const aptStart = format(new Date(apt.start_time), "HH:mm");
+                      const aptEnd = format(new Date(apt.end_time), "HH:mm");
+
                       return (
                         <div
                           key={apt.id}
-                          className="flex items-center gap-2 text-sm bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded px-2 py-1 min-w-0"
+                          className="flex items-center gap-2 text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg px-2.5 py-1.5 min-w-0 border border-amber-500/10"
                         >
-                          <span className="font-mono font-medium shrink-0 text-xs">
-                            {startTime} - {endTime}
+                          <span className="font-mono font-semibold shrink-0">
+                            {aptStart} - {aptEnd}
                           </span>
-                          <span className="text-muted-foreground shrink-0">•</span>
-                          <span className="truncate min-w-0">
+                          <span className="text-amber-500/50 shrink-0">•</span>
+                          <span className="truncate min-w-0 opacity-80">
                             {apt.title}
                           </span>
                         </div>
@@ -295,39 +338,57 @@ export const CreateAppointmentDialog = ({
                     })}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    Nenhum agendamento para esta data
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 italic flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Dia livre — nenhum compromisso
                   </p>
                 )}
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="startTime">Início *</Label>
-              <Input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
+          {/* Horário início / fim */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                Início *
+              </Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="pl-10 h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:bg-background transition-colors"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="endTime">Término *</Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                Término *
+              </Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="pl-10 h-11 bg-muted/30 border-border/50 focus:border-primary/50 focus:bg-background transition-colors"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label>{terminology.singular} (opcional)</Label>
+          {/* Lead */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+              {terminology.singular}{" "}
+              <span className="text-[10px] normal-case tracking-normal font-normal">(opcional)</span>
+            </Label>
             <Select value={leadId || "none"} onValueChange={(val) => setLeadId(val === "none" ? "" : val)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11 bg-muted/30 border-border/50">
                 <SelectValue placeholder={`Selecione um ${terminology.singularLower}`} />
               </SelectTrigger>
               <SelectContent>
@@ -341,30 +402,39 @@ export const CreateAppointmentDialog = ({
             </Select>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="description">Descrição (opcional)</Label>
+          {/* Descrição */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+              Descrição{" "}
+              <span className="text-[10px] normal-case tracking-normal font-normal">(opcional)</span>
+            </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Detalhes do agendamento..."
+              placeholder="Adicione detalhes sobre o agendamento..."
               rows={3}
+              className="min-h-[80px] resize-none bg-muted/30 border-border/50 focus:border-primary/50 focus:bg-background transition-colors"
             />
           </div>
-        </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending || !title.trim() || !date}
-            className="w-full sm:w-auto"
-          >
-            {createMutation.isPending ? "Criando..." : "Criar Agendamento"}
-          </Button>
-        </DialogFooter>
+          {/* Summary preview */}
+          {title.trim() && date && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-primary/5 to-primary/[0.02] border border-primary/10">
+              <div className="h-9 w-9 rounded-lg bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                <CalendarIcon className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{title.trim()}</p>
+                <p className="text-xs text-muted-foreground">
+                  {format(date, "dd/MM/yyyy", { locale: ptBR })} às {startTime} - {endTime}
+                </p>
+              </div>
+            </div>
+          )}
+
+
+        </div>
       </DialogContent>
     </Dialog>
   );

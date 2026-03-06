@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
+import { useTranslation } from "react-i18next";
 
 interface AppointmentsSidebarItemProps {
   collapsed: boolean;
@@ -19,6 +20,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
 
@@ -73,7 +75,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
   };
 
   const formatPhone = (phone: string | null) => {
-    if (!phone) return "Sem número";
+    if (!phone) return t("sidebar.noNumber");
     return phone.replace(/^55/, "+55 ");
   };
 
@@ -100,7 +102,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right" className="flex flex-col gap-1">
-          <span className="font-medium">Agendamentos</span>
+          <span className="font-medium">{t("sidebar.appointments")}</span>
           {instances && instances.length > 0 && (
             <div className="text-xs text-muted-foreground">
               {instances.map((inst) => {
@@ -137,7 +139,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
           "shrink-0 transition-all duration-200 ease-out",
           isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
         )} />
-        <span className="flex-1 text-left">Agendamentos</span>
+        <span className="flex-1 text-left">{t("sidebar.appointments")}</span>
         {totalAppointments > 0 && (
           <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
             {totalAppointments > 99 ? "99+" : totalAppointments}
@@ -164,7 +166,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
             "shrink-0 transition-all duration-200 ease-out",
             isParentActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
           )} />
-          <span className="flex-1 text-left">Agendamentos</span>
+          <span className="flex-1 text-left">{t("sidebar.appointments")}</span>
           {totalAppointments > 0 && (
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
               {totalAppointments > 99 ? "99+" : totalAppointments}
@@ -189,7 +191,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
               : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
           )}
         >
-          <span className="flex-1">Todos</span>
+          <span className="flex-1">{t("sidebar.allMale")}</span>
           {totalAppointments > 0 && (
             <span className="text-xs text-muted-foreground">({totalAppointments})</span>
           )}
@@ -224,7 +226,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
 
         {(!instances || instances.length === 0) && (
           <div className="px-3 py-1.5 text-xs text-muted-foreground italic">
-            Nenhuma instância conectada
+            {t("sidebar.noConnectedInstance")}
           </div>
         )}
       </CollapsibleContent>

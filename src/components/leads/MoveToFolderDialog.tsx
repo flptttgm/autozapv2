@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderInput, Loader2, Folder, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface MoveToFolderDialogProps {
     open: boolean;
@@ -37,11 +38,12 @@ export function MoveToFolderDialog({
     const [actionType, setActionType] = useState<"move" | "copy">("move");
     const { profile } = useAuth();
     const queryClient = useQueryClient();
+    const { t } = useTranslation("leads");
 
     const moveLeadsMutation = useMutation({
         mutationFn: async () => {
-            if (!profile?.workspace_id) throw new Error("Workspace não encontrado");
-            if (selectedLeads.size === 0) throw new Error("Nenhum lead selecionado");
+            if (!profile?.workspace_id) throw new Error(t("workspaceNotFound"));
+            if (selectedLeads.size === 0) throw new Error(t("noLeadsSelected"));
 
             const leadIds = Array.from(selectedLeads);
 
@@ -76,13 +78,13 @@ export function MoveToFolderDialog({
             queryClient.invalidateQueries({ queryKey: ["lead-folders"] });
             queryClient.invalidateQueries({ queryKey: ["leads-counts"] });
 
-            const actionText = actionType === "move" ? "movidos" : "copiados";
-            toast.success(`${selectedLeads.size} leads ${actionText} com sucesso!`);
+            const actionText = actionType === "move" ? t("moveSuccess", { count: selectedLeads.size }) : t("copySuccess", { count: selectedLeads.size });
+            toast.success(actionText);
             onSuccess?.();
             handleClose();
         },
         onError: (error: Error) => {
-            toast.error(error.message || `Erro ao processar os leads`);
+            toast.error(error.message || t("processError"));
         },
     });
 
@@ -103,13 +105,13 @@ export function MoveToFolderDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {actionType === "move" ? <FolderInput className="h-5 w-5 text-primary" /> : <Copy className="h-5 w-5 text-primary" />}
-                        Organizar {selectedLeads.size} lead(s)
+                        {t("organizeLeads", { count: selectedLeads.size })}
                     </DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
                     <div className="space-y-3">
-                        <Label>Ação Desejada</Label>
+                        <Label>{t("desiredAction")}</Label>
                         <RadioGroup
                             value={actionType}
                             onValueChange={(val: "move" | "copy") => {
@@ -127,8 +129,8 @@ export function MoveToFolderDialog({
                                     }`}
                             >
                                 <RadioGroupItem value="move" id="move" />
-                                <span className="flex-1 font-medium">Mover</span>
-                                <span className="text-xs text-muted-foreground ml-auto">Retira da pasta atual</span>
+                                <span className="flex-1 font-medium">{t("moveAction")}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">{t("moveActionDesc")}</span>
                             </Label>
                             <Label
                                 htmlFor="copy"
@@ -136,24 +138,24 @@ export function MoveToFolderDialog({
                                     }`}
                             >
                                 <RadioGroupItem value="copy" id="copy" />
-                                <span className="flex-1 font-medium">Copiar</span>
-                                <span className="text-xs text-muted-foreground ml-auto">Mantém onde já está</span>
+                                <span className="flex-1 font-medium">{t("copyAction")}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">{t("copyActionDesc")}</span>
                             </Label>
                         </RadioGroup>
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Selecione a pasta de destino</Label>
+                        <Label>{t("selectTargetFolder")}</Label>
                         <Select value={targetFolderId} onValueChange={setTargetFolderId}>
                             <SelectTrigger>
-                                <SelectValue placeholder="Escolha a pasta" />
+                                <SelectValue placeholder={t("chooseFolderPlaceholder")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {actionType === "move" && (
                                     <SelectItem value="general">
                                         <div className="flex items-center gap-2">
                                             <Folder className="h-4 w-4 text-muted-foreground" />
-                                            <span>Todos (Remover de todas as pastas)</span>
+                                            <span>{t("allFoldersRemove")}</span>
                                         </div>
                                     </SelectItem>
                                 )}
@@ -172,7 +174,7 @@ export function MoveToFolderDialog({
                     <DialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-4">
                         <DialogClose asChild>
                             <Button type="button" variant="outline" className="w-full sm:w-auto">
-                                Cancelar
+                                {t("cancel")}
                             </Button>
                         </DialogClose>
                         <Button
@@ -183,10 +185,10 @@ export function MoveToFolderDialog({
                             {moveLeadsMutation.isPending ? (
                                 <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Processando...
+                                    {t("processing")}
                                 </>
                             ) : (
-                                "Confirmar"
+                                t("confirmBtn")
                             )}
                         </Button>
                     </DialogFooter>

@@ -65,17 +65,17 @@ export const AppointmentHistoryTable = ({
     queryKey: ["leads-for-history-filter", profile?.workspace_id, selectedInstance],
     queryFn: async () => {
       if (!profile?.workspace_id) return [];
-      
+
       let query = supabase
         .from("leads")
         .select("id, name, phone")
         .eq("workspace_id", profile.workspace_id)
         .order("name", { ascending: true });
-      
+
       if (selectedInstance) {
         query = query.eq("whatsapp_instance_id", selectedInstance);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
@@ -110,18 +110,11 @@ export const AppointmentHistoryTable = ({
       let query = supabase
         .from("appointments")
         .select(
-          "id, title, description, start_time, end_time, status, created_at, source, metadata, created_by, lead_id, leads(name, phone, whatsapp_instance_id)",
+          "id, title, description, start_time, end_time, status, created_at, metadata, lead_id, leads(name, phone, whatsapp_instance_id)",
           { count: "exact" }
         )
         .eq("workspace_id", profile.workspace_id)
         .order("created_at", { ascending: false });
-
-      // Apply source filter
-      if (sourceFilter === "manual") {
-        query = query.eq("source", "manual");
-      } else if (sourceFilter === "ai") {
-        query = query.eq("source", "ai");
-      }
 
       // Apply status filter
       if (statusFilter !== "all") {
@@ -185,22 +178,20 @@ export const AppointmentHistoryTable = ({
       return;
     }
 
-    const headers = ["Título", "Lead", "Telefone", "Data/Hora", "Origem", "Status", "Criado em"];
-    
+    const headers = ["Título", "Lead", "Telefone", "Data/Hora", "Status", "Criado em"];
+
     const rows = historyData.appointments.map((appointment) => {
       const leadName = appointment.leads?.name || "-";
       const leadPhone = appointment.leads?.phone || "-";
       const dateTime = format(new Date(appointment.start_time), "dd/MM/yyyy HH:mm", { locale: ptBR });
-      const source = appointment.source === "ai" ? "IA" : "Manual";
       const status = getStatusLabel(appointment.status || "scheduled");
       const createdAt = format(new Date(appointment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR });
-      
+
       return [
         `"${appointment.title.replace(/"/g, '""')}"`,
         `"${leadName.replace(/"/g, '""')}"`,
         `"${leadPhone}"`,
         `"${dateTime}"`,
-        `"${source}"`,
         `"${status}"`,
         `"${createdAt}"`,
       ].join(",");
@@ -210,7 +201,7 @@ export const AppointmentHistoryTable = ({
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement("a");
     link.href = url;
     link.download = `historico-agendamentos-${format(new Date(), "yyyy-MM-dd")}.csv`;
@@ -218,7 +209,7 @@ export const AppointmentHistoryTable = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     toast.success(`${historyData.appointments.length} agendamento(s) exportado(s)`);
   };
 
@@ -226,27 +217,27 @@ export const AppointmentHistoryTable = ({
     <Card className="flex-1 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="p-4 border-b space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Histórico de Agendamentos
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {historyData?.count || 0} agendamento(s) encontrado(s)
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToCSV}
-              disabled={!historyData?.appointments?.length}
-              className="gap-1.5"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Exportar CSV</span>
-            </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico de Agendamentos
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {historyData?.count || 0} agendamento(s) encontrado(s)
+            </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={!historyData?.appointments?.length}
+            className="gap-1.5"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </Button>
+        </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
@@ -255,22 +246,7 @@ export const AppointmentHistoryTable = ({
             <span className="hidden sm:inline">Filtros:</span>
           </div>
 
-          <Select
-            value={sourceFilter}
-            onValueChange={(value: SourceFilter) => {
-              setSourceFilter(value);
-              handleFilterChange();
-            }}
-          >
-            <SelectTrigger className="w-[130px] h-8 text-xs">
-              <SelectValue placeholder="Origem" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas origens</SelectItem>
-              <SelectItem value="ai">🤖 IA</SelectItem>
-              <SelectItem value="manual">👤 Manual</SelectItem>
-            </SelectContent>
-          </Select>
+
 
           <Select
             value={statusFilter}
@@ -358,7 +334,6 @@ export const AppointmentHistoryTable = ({
                 <TableHead className="w-[200px]">Título</TableHead>
                 <TableHead className="hidden md:table-cell">Lead</TableHead>
                 <TableHead>Data/Hora</TableHead>
-                <TableHead className="w-[100px]">Criador</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
                 <TableHead className="hidden lg:table-cell w-[130px]">Criado em</TableHead>
               </TableRow>
@@ -371,8 +346,8 @@ export const AppointmentHistoryTable = ({
                 const isAi = appointment.source === "ai";
                 const metadata = appointment.metadata as any;
                 const wasCancelledByWhatsApp = metadata?.cancelled_by === 'customer_whatsapp';
-                const wasRescheduledByWhatsApp = metadata?.rescheduled_from_whatsapp || 
-                                                  metadata?.reschedule_requested_by === 'customer_whatsapp';
+                const wasRescheduledByWhatsApp = metadata?.rescheduled_from_whatsapp ||
+                  metadata?.reschedule_requested_by === 'customer_whatsapp';
 
                 return (
                   <TableRow
@@ -418,29 +393,7 @@ export const AppointmentHistoryTable = ({
                         {format(startDate, "HH:mm", { locale: ptBR })}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs gap-1",
-                          isAi
-                            ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20"
-                            : "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20"
-                        )}
-                      >
-                        {isAi ? (
-                          <>
-                            <MessageCircle className="h-3 w-3" />
-                            WhatsApp
-                          </>
-                        ) : (
-                          <>
-                            <User className="h-3 w-3" />
-                            Manual
-                          </>
-                        )}
-                      </Badge>
-                    </TableCell>
+
                     <TableCell>
                       <Badge variant="outline" className={cn("text-xs", statusConfig?.className)}>
                         {statusConfig?.label || appointment.status}

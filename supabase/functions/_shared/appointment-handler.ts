@@ -96,6 +96,17 @@ export async function handleAppointmentFlow(
 
                 if (error) throw error;
 
+                // Create an audit log entry explicitly for the global timeline
+                await supabase.from('audit_logs').insert({
+                    workspace_id: workspaceId,
+                    user_id: '00000000-0000-0000-0000-000000000000', // system/ai fallback
+                    user_name: 'Inteligência Artificial',
+                    action: 'create',
+                    entity_type: 'appointment',
+                    entity_id: appt?.id,
+                    changes_summary: `Agendamento criado via IA: ${mergedData.purpose || 'Reunião'} para ${mergedData.date} às ${mergedData.time}`
+                });
+
                 return {
                     response: `✅ Agendado com sucesso para ${mergedData.date} às ${mergedData.time}!`,
                     updatedFlags: { ...contextFlags, appointment: null }, // Clear flow

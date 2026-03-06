@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
 
 export interface LeadFolder {
   id: string;
@@ -52,6 +53,7 @@ export function FolderTabs({
   allowedFolderIds = null,
   canManageTeam = true,
 }: FolderTabsProps) {
+  const { t } = useTranslation("leads");
   const [folderToDelete, setFolderToDelete] = useState<LeadFolder | null>(null);
 
   const TabButton = ({
@@ -119,7 +121,7 @@ export function FolderTabs({
             isActive={selectedFolderId === null || selectedFolderId === "general"}
             onClick={() => onSelectFolder(null)}
             icon={FolderOpen}
-            label="Todos"
+            label={t("allFolders")}
             count={generalLeadsCount}
           />
 
@@ -147,7 +149,7 @@ export function FolderTabs({
                       onClick={() => setFolderToDelete(folder)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Excluir pasta
+                      {t("deleteFolder")}
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
@@ -173,7 +175,7 @@ export function FolderTabs({
               onClick={onCreateFolder}
             >
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nova pasta</span>
+              <span className="hidden sm:inline">{t("newFolder")}</span>
             </Button>
           )}
         </div>
@@ -183,24 +185,24 @@ export function FolderTabs({
       <AlertDialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir pasta "{folderToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteFolderTitle", { folderName: folderToDelete?.name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A pasta será excluída permanentemente.
+              {t("deleteFolderWarning1")}
               {folderToDelete && folderToDelete.lead_count > 0 && (
                 <>
                   <br /><br />
-                  Os <strong>{folderToDelete.lead_count} contatos</strong> desta pasta não serão excluídos — eles voltarão para a aba "Todos".
+                  {t("deleteFolderWarning2", { count: folderToDelete.lead_count })}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

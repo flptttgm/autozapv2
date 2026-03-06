@@ -51,6 +51,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTerminology } from "@/hooks/useTerminology";
+import { useTranslation } from "react-i18next";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { SupportChatSidebar } from "@/components/SupportChatSidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -92,6 +93,7 @@ const Index = () => {
   const [period, setPeriod] = useState<PeriodFilter>(7);
   const [supportChatOpen, setSupportChatOpen] = useState(false);
   const { terminology } = useTerminology();
+  const { t, i18n } = useTranslation("dashboard");
   const { profile } = useAuth();
   const isMobile = useIsMobile();
 
@@ -546,12 +548,12 @@ const Index = () => {
     }
 
     const headers = [
-      "Período",
-      "Recebidas (atual)",
-      "Enviadas (atual)",
+      t("period"),
+      t("receivedCurrent"),
+      t("sentCurrent"),
       "Total (atual)",
-      "Recebidas (anterior)",
-      "Enviadas (anterior)",
+      t("receivedPrevious"),
+      t("sentPrevious"),
       "Total (anterior)",
     ];
     const rows = messagesChartData.map((d) => [
@@ -565,8 +567,10 @@ const Index = () => {
     ]);
 
     const csvContent = [
-      `Relatório de Mensagens - Últimos ${period} dias`,
-      `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
+      t("messagesReportLastDays", { count: period }),
+      `${t("generatedAt")}: ${new Date().toLocaleString(
+        i18n.language === "en" ? "en-US" : "pt-BR"
+      )}`,
       "",
       headers.join(","),
       ...rows.map((r) => r.join(",")),
@@ -575,10 +579,10 @@ const Index = () => {
     // Add summary
     const summaryCSV = [
       "",
-      "RESUMO",
-      `Total de Mensagens (atual),${periodComparison?.currentTotal || 0}`,
-      `Total de Mensagens (anterior),${periodComparison?.previousTotal || 0}`,
-      `Variação,${periodComparison?.totalChange || 0}%`,
+      t("summary"),
+      `${t("totalMessagesCurrent")},${periodComparison?.currentTotal || 0}`,
+      `${t("totalMessagesPrevious")},${periodComparison?.previousTotal || 0}`,
+      `${t("variation")},${periodComparison?.totalChange || 0}%`,
     ].join("\n");
 
     const fullCSV = csvContent + summaryCSV;
@@ -589,12 +593,12 @@ const Index = () => {
     link.download = `relatorio-mensagens-${period}dias-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
 
-    toast.success("Relatório CSV exportado com sucesso!");
+    toast.success(t("csvExportSuccess"));
   };
 
   const exportToPDF = () => {
     if (!messagesChartData || messagesChartData.length === 0) {
-      toast.error("Nenhum dado para exportar");
+      toast.error(t("noDataToExport"));
       return;
     }
 
@@ -618,14 +622,16 @@ const Index = () => {
     const safeTotalChange = safeNumber(periodComparison?.totalChange);
     const safeInboundChange = safeNumber(periodComparison?.inboundChange);
     const safeOutboundChange = safeNumber(periodComparison?.outboundChange);
-    const safeDate = escapeHtml(new Date().toLocaleString("pt-BR"));
+    const safeDate = escapeHtml(new Date().toLocaleString(
+      i18n.language === "en" ? "en-US" : "pt-BR"
+    ));
 
     // Create printable HTML content with sanitized values
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Relatório de Mensagens - ${safePeriod} dias</title>
+        <title>${t("messagesReport")} - ${safePeriod} ${t("days")}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
           h1 { color: #1a1a2e; border-bottom: 2px solid #25D366; padding-bottom: 10px; }
@@ -642,22 +648,22 @@ const Index = () => {
         </style>
       </head>
       <body>
-        <h1>📊 Relatório de Mensagens</h1>
+        <h1>📊 ${t("messagesReport")}</h1>
         <div class="meta">
-          <p><strong>Período:</strong> Últimos ${safePeriod} dias</p>
-          <p><strong>Gerado em:</strong> ${safeDate}</p>
+          <p><strong>${t("period")}:</strong> ${t("lastDays", { count: safePeriod })}</p>
+          <p><strong>${t("generatedAt")}:</strong> ${safeDate}</p>
         </div>
         
-        <h2>Dados por Período</h2>
+        <h2>${t("dataByPeriod")}</h2>
         <table>
           <thead>
             <tr>
-              <th>Período</th>
-              <th>Recebidas (atual)</th>
-              <th>Enviadas (atual)</th>
+              <th>${t("period")}</th>
+              <th>${t("receivedCurrent")}</th>
+              <th>${t("sentCurrent")}</th>
               <th>Total (atual)</th>
-              <th>Recebidas (anterior)</th>
-              <th>Enviadas (anterior)</th>
+              <th>${t("receivedPrevious")}</th>
+              <th>${t("sentPrevious")}</th>
               <th>Total (anterior)</th>
             </tr>
           </thead>
@@ -681,29 +687,29 @@ const Index = () => {
         </table>
         
         <div class="summary">
-          <h2 style="margin-top: 0;">📈 Resumo Comparativo</h2>
+          <h2 style="margin-top: 0;">📈 ${t("comparativeSummary")}</h2>
           <div class="summary-item">
-            <span>Total de Mensagens (atual)</span>
+            <span>${t("totalMessagesCurrent")}</span>
             <strong>${safeCurrentTotal}</strong>
           </div>
           <div class="summary-item">
-            <span>Total de Mensagens (anterior)</span>
+            <span>${t("totalMessagesPrevious")}</span>
             <strong>${safePreviousTotal}</strong>
           </div>
           <div class="summary-item">
-            <span>Variação</span>
+            <span>${t("variation")}</span>
             <span class="${safeTotalChange >= 0 ? "positive" : "negative"}">
               ${safeTotalChange >= 0 ? "+" : ""}${safeTotalChange}%
             </span>
           </div>
           <div class="summary-item">
-            <span>Mensagens Recebidas (variação)</span>
+            <span>${t("messagesReceivedVariation")}</span>
             <span class="${safeInboundChange >= 0 ? "positive" : "negative"}">
               ${safeInboundChange >= 0 ? "+" : ""}${safeInboundChange}%
             </span>
           </div>
           <div class="summary-item">
-            <span>Mensagens Enviadas (variação)</span>
+            <span>${t("messagesSentVariation")}</span>
             <span class="${safeOutboundChange >= 0 ? "positive" : "negative"}">
               ${safeOutboundChange >= 0 ? "+" : ""}${safeOutboundChange}%
             </span>
@@ -711,7 +717,7 @@ const Index = () => {
         </div>
         
         <p style="margin-top: 40px; color: #999; font-size: 12px; text-align: center;">
-          Relatório gerado automaticamente pelo Autozap
+          ${t("autoGeneratedReport")}
         </p>
       </body>
       </html>
@@ -724,9 +730,9 @@ const Index = () => {
       setTimeout(() => {
         printWindow.print();
       }, 500);
-      toast.success("Preparando PDF para impressão...");
+      toast.success(t("preparingPdf"));
     } else {
-      toast.error("Não foi possível abrir a janela de impressão");
+      toast.error(t("printError"));
     }
   };
 
@@ -830,13 +836,13 @@ const Index = () => {
       });
 
       const statusLabels: Record<string, string> = {
-        new: "Novos",
-        contacted: "Contatados",
-        qualified: "Qualificados",
-        proposal: "Proposta",
-        negotiation: "Negociação",
-        won: "Fechados",
-        lost: "Perdidos",
+        new: t("statusNew"),
+        contacted: t("statusContacted"),
+        qualified: t("statusQualified"),
+        proposal: t("statusProposal"),
+        negotiation: t("statusNegotiation"),
+        won: t("statusWon"),
+        lost: t("statusLost"),
       };
 
       return Object.entries(statusCounts)
@@ -867,7 +873,8 @@ const Index = () => {
           const newMessage = payload.new as any;
 
           if (newMessage.direction === "inbound") {
-            let senderName = `Novo ${terminology.singularLower}`;
+            const newTerm = terminology.singularLower.endsWith('a') ? t("newFemale") : t("newMale");
+            let senderName = `${newTerm} ${terminology.singularLower}`;
             if (newMessage.lead_id) {
               const { data: lead } = await supabase
                 .from("leads")
@@ -879,11 +886,11 @@ const Index = () => {
                 senderName =
                   lead.name ||
                   lead.phone ||
-                  `Novo ${terminology.singularLower}`;
+                  `${newTerm} ${terminology.singularLower}`;
               }
             }
 
-            toast.info(`Nova mensagem de ${senderName}`, {
+            toast.info(`${t("newMessageFrom")} ${senderName}`, {
               description:
                 newMessage.content?.substring(0, 60) +
                 (newMessage.content?.length > 60 ? "..." : ""),
@@ -904,12 +911,12 @@ const Index = () => {
   }, [queryClient, terminology, profile?.workspace_id]);
 
   const getResponseRateLabel = (rate: number): string => {
-    if (rate >= 100) return "Ultra Rápido";
-    if (rate >= 90) return "Muito Rápido";
-    if (rate >= 80) return "Rápido";
-    if (rate >= 60) return "Bom";
-    if (rate >= 40) return "Moderado";
-    return "Lento";
+    if (rate >= 100) return t("ultraFast");
+    if (rate >= 90) return t("veryFast");
+    if (rate >= 80) return t("fast");
+    if (rate >= 60) return t("good");
+    if (rate >= 40) return t("moderate");
+    return t("slow");
   };
 
   // Calculate leads growth percentage (week over week)
@@ -940,7 +947,7 @@ const Index = () => {
     iconColor: "emerald" | "blue" | "orange" | "purple";
   }> = [
       {
-        title: `Total de ${terminology.plural}`,
+        title: `${t("totalOf")} ${terminology.plural}`,
         value: leadsCount?.toString() || "0",
         change: leadsGrowthChange,
         icon: Users,
@@ -948,23 +955,23 @@ const Index = () => {
         iconColor: "emerald",
       },
       {
-        title: "Conversas Ativas",
+        title: t("activeConversations"),
         value: conversationsCount?.toString() || "0",
-        change: `+${activeConversationsToday ?? 0} hoje`,
+        change: `+${activeConversationsToday ?? 0} ${t("today")}`,
         icon: MessageSquare,
         trend: (activeConversationsToday ?? 0) > 0 ? "up" : "neutral",
         iconColor: "blue",
       },
       {
-        title: "Agendamentos",
+        title: t("appointments"),
         value: appointmentsToday?.toString() || "0",
-        change: (appointmentsToday ?? 0) <= 1 ? "Pendente" : "Pendentes",
+        change: (appointmentsToday ?? 0) <= 1 ? t("pendingSingular") : t("pendingPlural"),
         icon: Calendar,
         trend: "neutral" as const,
         iconColor: "orange",
       },
       {
-        title: "Taxa de Resposta",
+        title: t("responseRate"),
         value: responseRateData ? `${responseRateData.rate}%` : "0%",
         change: getResponseRateLabel(responseRateData?.rate ?? 0),
         icon: Activity,
@@ -979,12 +986,12 @@ const Index = () => {
     const diffMs = now.getTime() - messageDate.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return "Agora";
-    if (diffMins < 60) return `${diffMins} min atrás`;
+    if (diffMins < 1) return t("justNow");
+    if (diffMins < 60) return t("minsAgo", { count: diffMins });
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h atrás`;
+    if (diffHours < 24) return t("hoursAgo", { count: diffHours });
     const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d atrás`;
+    return t("daysAgo", { count: diffDays });
   };
 
   // Mobile-optimized layout
@@ -1029,7 +1036,7 @@ const Index = () => {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3 px-1">
               <h2 className="text-sm font-semibold text-muted-foreground">
-                Desempenho
+                {t("performance")}
               </h2>
               <div className="flex gap-1">
                 {([7, 30, 90] as PeriodFilter[]).map((p) => (
@@ -1041,7 +1048,7 @@ const Index = () => {
                       : "bg-muted text-muted-foreground"
                       }`}
                   >
-                    {p}d
+                    {p}{t("daysShort")}
                   </button>
                 ))}
               </div>
@@ -1050,13 +1057,13 @@ const Index = () => {
             <Tabs defaultValue="activity" className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-3 h-9">
                 <TabsTrigger value="activity" className="text-xs">
-                  Atividade
+                  {t("activity")}
                 </TabsTrigger>
                 <TabsTrigger value="status" className="text-xs">
-                  Status
+                  {t("status")}
                 </TabsTrigger>
                 <TabsTrigger value="volume" className="text-xs">
-                  Volume
+                  {t("volume")}
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="activity">
@@ -1120,7 +1127,7 @@ const Index = () => {
                           <Area
                             type="monotone"
                             dataKey="recebidas"
-                            name="Recebidas"
+                            name={t("received")}
                             stroke="hsl(142 76% 36%)"
                             fillOpacity={1}
                             fill="url(#colorRecebidasMobile)"
@@ -1128,7 +1135,7 @@ const Index = () => {
                           <Area
                             type="monotone"
                             dataKey="enviadas"
-                            name="Enviadas"
+                            name={t("sent")}
                             stroke="hsl(221 83% 53%)"
                             fillOpacity={1}
                             fill="url(#colorEnviadasMobile)"
@@ -1170,7 +1177,7 @@ const Index = () => {
                         </ResponsiveContainer>
                       ) : (
                         <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                          Nenhum {terminology.singularLower} registrado
+                          {t("noneRegistered", { entity: terminology.singularLower })}
                         </div>
                       )}
                     </div>
@@ -1192,13 +1199,13 @@ const Index = () => {
                           <Tooltip />
                           <Bar
                             dataKey="recebidas"
-                            name="Recebidas"
+                            name={t("received")}
                             fill="hsl(142 76% 36%)"
                             radius={[4, 4, 0, 0]}
                           />
                           <Bar
                             dataKey="enviadas"
-                            name="Enviadas"
+                            name={t("sent")}
                             fill="hsl(221 83% 53%)"
                             radius={[4, 4, 0, 0]}
                           />
@@ -1266,11 +1273,10 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-foreground drop-shadow-sm">
-                    Visão Geral
+                    {t("overview")}
                   </h1>
                   <p className="text-muted-foreground text-sm sm:text-base max-w-lg font-medium">
-                    Acompanhe em tempo real o desempenho do seu funil de
-                    atendimento e a performance da equipe.
+                    {t("overviewDescription")}
                   </p>
                 </div>
                 <Badge
@@ -1290,7 +1296,7 @@ const Index = () => {
                         : "bg-red-400",
                     )}
                   />
-                  {whatsappStatus ? "Sistema Ativo" : "Sem Conexão"}
+                  {whatsappStatus ? t("systemActive") : t("noConnection")}
                 </Badge>
               </div>
 
@@ -1397,10 +1403,10 @@ const Index = () => {
                 <CardHeader className="flex flex-row items-center justify-between pb-4 border-b shrink-0">
                   <div>
                     <CardTitle className="text-xl font-bold">
-                      Conversas Recentes
+                      {t("recentConversations")}
                     </CardTitle>
                     <CardDescription className="font-medium mt-1">
-                      Últimas interações via WhatsApp
+                      {t("recentConversationsDescription")}
                     </CardDescription>
                   </div>
                   <Button
@@ -1409,7 +1415,7 @@ const Index = () => {
                     onClick={() => navigate("/conversations")}
                     className="shrink-0 group"
                   >
-                    Ver todas{" "}
+                    {t("seeAll")}{" "}
                     <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </CardHeader>
@@ -1457,7 +1463,7 @@ const Index = () => {
                             <p className="text-xs text-muted-foreground line-clamp-1">
                               {msg.direction === "outbound" && (
                                 <span className="text-primary/70 font-bold text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-primary/10 mr-1.5 inline-block">
-                                  Você
+                                  {t("you")}
                                 </span>
                               )}
                               {msg.content}
@@ -1477,7 +1483,7 @@ const Index = () => {
                           <div className="flex items-center gap-2">
                             {msg.direction === "outbound" && (
                               <span className="shrink-0 text-primary/70 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-primary/10 inline-block">
-                                Você
+                                {t("you")}
                               </span>
                             )}
                             <p className="text-sm text-muted-foreground truncate">
@@ -1493,7 +1499,7 @@ const Index = () => {
                         <MessageSquare className="h-6 w-6 text-muted-foreground/50" />
                       </div>
                       <p className="text-muted-foreground font-medium">
-                        Nenhuma conversa registrada ainda
+                        {t("noConversationsYet")}
                       </p>
                     </div>
                   )}
@@ -1517,11 +1523,11 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
             <div>
               <h2 className="text-lg sm:text-xl font-semibold">
-                Gráficos de Desempenho
+                {t("performanceCharts")}
               </h2>
               {periodComparison && (
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  Comparando com os {period} dias anteriores
+                  {t("comparingWithPreviousDays", { count: period })}
                 </p>
               )}
             </div>
@@ -1531,28 +1537,28 @@ const Index = () => {
                 size="sm"
                 onClick={() => setPeriod(7)}
               >
-                7 dias
+                7 {t("days")}
               </Button>
               <Button
                 variant={period === 30 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setPeriod(30)}
               >
-                30 dias
+                30 {t("days")}
               </Button>
               <Button
                 variant={period === 90 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setPeriod(90)}
               >
-                90 dias
+                90 {t("days")}
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Download className="h-4 w-4" />
-                    Exportar
+                    {t("export")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -1561,14 +1567,14 @@ const Index = () => {
                     className="gap-2 cursor-pointer"
                   >
                     <FileSpreadsheet className="h-4 w-4" />
-                    Exportar CSV
+                    {t("exportCSV")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={exportToPDF}
                     className="gap-2 cursor-pointer"
                   >
                     <FileText className="h-4 w-4" />
-                    Exportar PDF
+                    {t("exportPDF")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1587,10 +1593,10 @@ const Index = () => {
                   <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 shrink-0">
                     <TrendingUp className="h-4 w-4 text-blue-400" />
                   </div>
-                  Atividade de Mensagens
+                  {t("messagesActivity")}
                 </CardTitle>
                 <CardDescription className="font-medium text-muted-foreground mt-1">
-                  Últimos {period} dias
+                  {t("lastDays", { count: period })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1662,7 +1668,7 @@ const Index = () => {
                       <Area
                         type="monotone"
                         dataKey="recebidas"
-                        name="Recebidas"
+                        name={t("received")}
                         stroke="hsl(142 76% 36%)"
                         fillOpacity={1}
                         fill="url(#colorRecebidas)"
@@ -1670,7 +1676,7 @@ const Index = () => {
                       <Area
                         type="monotone"
                         dataKey="enviadas"
-                        name="Enviadas"
+                        name={t("sent")}
                         stroke="hsl(221 83% 53%)"
                         fillOpacity={1}
                         fill="url(#colorEnviadas)"
@@ -1691,10 +1697,10 @@ const Index = () => {
                   <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 shrink-0">
                     <PieChart className="h-4 w-4 text-purple-400" />
                   </div>
-                  {terminology.plural} por Status
+                  {terminology.plural} {t("byStatus")}
                 </CardTitle>
                 <CardDescription className="font-medium text-muted-foreground mt-1">
-                  Distribuição atual
+                  {t("currentDistribution")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1740,7 +1746,7 @@ const Index = () => {
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-full flex items-center justify-center text-muted-foreground">
-                      Nenhum {terminology.singularLower} registrado
+                      {t("noneRegistered", { entity: terminology.singularLower })}
                     </div>
                   )}
                 </div>
@@ -1756,7 +1762,7 @@ const Index = () => {
                 <CardContent className="pt-5 pb-5">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-muted-foreground w-full">
-                      Total de Mensagens
+                      {t("totalMessages")}
                     </p>
                     <Badge
                       className={cn(
@@ -1776,7 +1782,7 @@ const Index = () => {
                     </p>
                   </div>
                   <p className="text-[10px] font-medium text-muted-foreground/70 mt-2">
-                    vs {periodComparison.previousTotal} no período anterior
+                    vs {periodComparison.previousTotal} {t("inPreviousPeriod")}
                   </p>
                 </CardContent>
               </Card>
@@ -1786,7 +1792,7 @@ const Index = () => {
                 <CardContent className="pt-5 pb-5">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-muted-foreground w-full">
-                      Mensagens Recebidas
+                      {t("messagesReceived")}
                     </p>
                     <Badge
                       className={cn(
@@ -1813,7 +1819,7 @@ const Index = () => {
                 <CardContent className="pt-5 pb-5">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-muted-foreground w-full">
-                      Mensagens Enviadas
+                      {t("messagesSent")}
                     </p>
                     <Badge
                       className={cn(
@@ -1846,10 +1852,10 @@ const Index = () => {
                 <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
                   <MessageSquare className="h-4 w-4 text-emerald-400" />
                 </div>
-                Volume de Mensagens com Comparativo
+                {t("messagesVolumeComparative")}
               </CardTitle>
               <CardDescription className="font-medium text-muted-foreground mt-1">
-                Período atual vs período anterior - últimos {period} dias
+                {t("currentVsPreviousPeriodLastDays", { count: period })}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
@@ -1883,25 +1889,25 @@ const Index = () => {
                     <Legend />
                     <Bar
                       dataKey="recebidas"
-                      name="Recebidas (atual)"
+                      name={t("receivedCurrent")}
                       fill="hsl(142 76% 36%)"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="recebidasAnterior"
-                      name="Recebidas (anterior)"
+                      name={t("receivedPrevious")}
                       fill="hsl(142 76% 36% / 0.3)"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="enviadas"
-                      name="Enviadas (atual)"
+                      name={t("sentCurrent")}
                       fill="hsl(221 83% 53%)"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="enviadasAnterior"
-                      name="Enviadas (anterior)"
+                      name={t("sentPrevious")}
                       fill="hsl(221 83% 53% / 0.3)"
                       radius={[4, 4, 0, 0]}
                     />
@@ -1914,33 +1920,33 @@ const Index = () => {
           {/* System Status */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="border-border shadow-sm flex items-center justify-between p-4 group hover:bg-muted/30 transition-colors duration-300">
-              <span className="text-sm font-semibold text-foreground">API's</span>
+              <span className="text-sm font-semibold text-foreground">{t("apis")}</span>
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
                 <span className="text-sm font-medium text-emerald-500 group-hover:text-emerald-400 transition-colors">
-                  Conectado
+                  {t("connected")}
                 </span>
               </div>
             </Card>
 
             <Card className="border-border shadow-sm flex items-center justify-between p-4 group hover:bg-muted/30 transition-colors duration-300">
-              <span className="text-sm font-semibold text-foreground">LLM's</span>
+              <span className="text-sm font-semibold text-foreground">{t("llms")}</span>
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
                 <span className="text-sm font-medium text-emerald-500 group-hover:text-emerald-400 transition-colors">
-                  Operacional
+                  {t("operational")}
                 </span>
               </div>
             </Card>
 
             <Card className="border-border shadow-sm flex items-center justify-between p-4 group hover:bg-muted/30 transition-colors duration-300">
               <span className="text-sm font-semibold text-foreground">
-                Banco de Dados
+                {t("database")}
               </span>
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
                 <span className="text-sm font-medium text-emerald-500 group-hover:text-emerald-400 transition-colors">
-                  Sincronizado
+                  {t("synchronized")}
                 </span>
               </div>
             </Card>

@@ -498,16 +498,16 @@ serve(async (req: Request) => {
           }
         }
 
-        // Check 5: Strict alternating pattern — 6+ messages strictly alternating directions within 5 min
+        // Check 5: Strict alternating pattern — 6+ messages strictly alternating directions within 1 min
         if (!shouldSkipAI && recentMsgs.length >= 6) {
           const last6 = msgs.slice(-6);
           const isAlternating = last6.every((m, i) => i === 0 || m.direction !== last6[i - 1].direction);
           if (isAlternating) {
             const newest6 = new Date(last6[last6.length - 1].created_at).getTime();
             const oldest6 = new Date(last6[0].created_at).getTime();
-            if (newest6 - oldest6 < 5 * 60 * 1000) {
+            if (newest6 - oldest6 < 1 * 60 * 1000) {
               shouldSkipAI = true;
-              console.log('[zapi-webhook] 🛑 Anti-Loop: Strict alternating 6-message pattern in <5min, skipping AI');
+              console.log('[zapi-webhook] 🛑 Anti-Loop: Strict alternating 6-message pattern in <1min, skipping AI');
             }
           }
         }
@@ -841,6 +841,34 @@ serve(async (req: Request) => {
         }
       }
 
+      // Build rich metadata with top-level media fields for UI components
+      const msgMetadata: Record<string, any> = {
+        source: 'whatsapp_direct',
+        senderName: payload.senderName || '',
+        chatLid: chatLid,
+        zapi_payload: payload,
+      };
+
+      // Extract media URL and metadata for the UI player/viewer components
+      if (payload.audio) {
+        msgMetadata.mediaUrl = payload.audio.audioUrl || '';
+        msgMetadata.duration = payload.audio.seconds || 0;
+        msgMetadata.mimeType = payload.audio.mimeType || 'audio/ogg';
+      } else if (payload.image) {
+        msgMetadata.mediaUrl = payload.image.imageUrl || '';
+        msgMetadata.mimeType = payload.image.mimeType || 'image/jpeg';
+      } else if (payload.video) {
+        msgMetadata.mediaUrl = payload.video.videoUrl || '';
+        msgMetadata.mimeType = payload.video.mimeType || 'video/mp4';
+      } else if (payload.document) {
+        msgMetadata.mediaUrl = payload.document.documentUrl || '';
+        msgMetadata.mimeType = payload.document.mimeType || 'application/pdf';
+        msgMetadata.fileName = payload.document.fileName || '';
+      } else if (payload.sticker) {
+        msgMetadata.mediaUrl = payload.sticker.stickerUrl || '';
+        msgMetadata.mimeType = payload.sticker.mimeType || 'image/webp';
+      }
+
       // Save the message as outbound_manual
       const { error: insertError } = await supabase.from('messages').insert({
         workspace_id: instance.workspace_id,
@@ -850,11 +878,7 @@ serve(async (req: Request) => {
         direction: 'outbound_manual',
         message_type: messageType,
         zapi_message_id: messageId,
-        metadata: {
-          source: 'whatsapp_direct',
-          senderName: payload.senderName || '',
-          chatLid: chatLid,
-        }
+        metadata: msgMetadata
       });
 
       if (insertError) {

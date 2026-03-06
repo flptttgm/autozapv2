@@ -13,17 +13,12 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Check, ChevronsUpDown, Loader2, Plus, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface WorkspaceSwitcherProps {
     collapsed?: boolean;
     headerMode?: boolean;
 }
-
-const ROLE_LABELS: Record<string, string> = {
-    owner: "Proprietário",
-    admin: "Administrador",
-    member: "Membro",
-};
 
 function getInitials(name: string): string {
     return name
@@ -83,6 +78,13 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
     const { workspaces, activeWorkspace, isLoading, switchWorkspace, isSwitching } =
         useUserWorkspaces();
     const navigate = useNavigate();
+    const { t } = useTranslation();
+
+    const ROLE_LABELS: Record<string, string> = {
+        owner: t("workspaceSwitcher.owner"),
+        admin: t("workspaceSwitcher.admin"),
+        member: t("workspaceSwitcher.member"),
+    };
 
     if (isLoading) {
         return (
@@ -142,7 +144,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                 <div className={cn("flex-1 min-w-0", collapsed && "lg:hidden")}>
                     <p className="text-sm font-semibold truncate">{activeWorkspace.name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                        {ROLE_LABELS[activeWorkspace.role] || "Membro"}
+                        {ROLE_LABELS[activeWorkspace.role] || t("workspaceSwitcher.member")}
                     </p>
                 </div>
                 {isSwitching ? (
@@ -178,7 +180,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                     sideOffset={8}
                 >
                     <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                        Seus Workspaces
+                        {t("workspaceSwitcher.yourWorkspaces")}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
@@ -193,7 +195,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{activeWorkspace.name}</p>
                             <p className="text-[11px] text-muted-foreground">
-                                {ROLE_LABELS[activeWorkspace.role] || "Membro"}
+                                {ROLE_LABELS[activeWorkspace.role] || t("workspaceSwitcher.member")}
                             </p>
                         </div>
                         <Check className="h-4 w-4 text-primary shrink-0" />
@@ -216,7 +218,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{ws.name}</p>
                                     <p className="text-[11px] text-muted-foreground">
-                                        {ROLE_LABELS[ws.role] || "Membro"}
+                                        {ROLE_LABELS[ws.role] || t("workspaceSwitcher.member")}
                                     </p>
                                 </div>
                             </DropdownMenuItem>
@@ -229,7 +231,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                         className="flex items-center gap-3 py-2 cursor-pointer text-muted-foreground"
                     >
                         <Plus className="h-4 w-4" />
-                        <span className="text-sm">Novo Workspace</span>
+                        <span className="text-sm">{t("workspaceSwitcher.newWorkspace")}</span>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -237,7 +239,7 @@ export function WorkspaceSwitcher({ collapsed = false, headerMode = false }: Wor
                         className="flex items-center gap-3 py-2 cursor-pointer text-muted-foreground"
                     >
                         <Settings className="h-4 w-4" />
-                        <span className="text-sm">Gerenciar Workspaces</span>
+                        <span className="text-sm">{t("workspaceSwitcher.manageWorkspaces")}</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -13,28 +13,23 @@ function normalizeMimeType(input: unknown, fallback: string): string {
   if (typeof input !== 'string') return fallback;
   const trimmed = input.trim();
   if (!trimmed) return fallback;
-  // Strip codecs, e.g. "audio/webm;codecs=opus" -> "audio/webm"
   return trimmed.split(';')[0] || fallback;
 }
 
 function stripBase64DataUrlPrefix(input: string): string {
-  // Accept any data:*;base64, prefix (audio/video/etc.)
   return input.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '').trim();
 }
 
 function guessFileExtensionFromMime(mimeType: string): string {
   const base = normalizeMimeType(mimeType, 'application/octet-stream');
-  // Audio types
   if (base === 'audio/wav') return 'wav';
   if (base === 'audio/ogg') return 'ogg';
   if (base === 'audio/webm') return 'webm';
   if (base === 'audio/mpeg' || base === 'audio/mp3') return 'mp3';
-  // Image types
   if (base === 'image/jpeg') return 'jpg';
   if (base === 'image/png') return 'png';
   if (base === 'image/webp') return 'webp';
   if (base === 'image/gif') return 'gif';
-  // Document types
   if (base === 'application/pdf') return 'pdf';
   if (base === 'application/msword') return 'doc';
   if (base === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
@@ -75,15 +70,12 @@ serve(async (req) => {
       user_id, 
       user_name, 
       instance_id: providedInstanceId,
-      // Audio fields
       audio_base64,
       audio_duration,
       audio_mime_type,
-      // Image fields
       image_base64,
       image_mime_type,
       image_caption,
-      // Document fields
       document_base64,
       document_mime_type,
       document_file_name,
@@ -111,7 +103,6 @@ serve(async (req) => {
       throw new Error('chat_id and (message, audio_base64, image_base64, or document_base64) are required');
     }
 
-    // Will be determined/overridden based on lead's existing messages
     let chat_id = providedChatId;
 
     console.log('Manual message send request:', { 
@@ -132,7 +123,6 @@ serve(async (req) => {
     let workspace_id: string | null = null;
     let destinationPhone: string | null = null;
 
-    // Se temos lead_id, buscar info do lead
     if (lead_id) {
       const { data: lead, error: leadError } = await supabase
         .from('leads')
@@ -142,7 +132,6 @@ serve(async (req) => {
 
       if (leadError || !lead?.phone) {
         console.error('Lead lookup failed:', { lead_id, error: leadError?.message });
-        // Não falhar aqui, tentar criar/encontrar lead
         lead_id = null;
       } else {
         workspace_id = lead.workspace_id;
@@ -150,11 +139,9 @@ serve(async (req) => {
       }
     }
 
-    // Se não temos lead_id ou não encontramos, tentar encontrar/criar a partir das mensagens existentes
     if (!lead_id || !workspace_id || !destinationPhone) {
       console.log('No lead found, attempting to find/create from chat history...');
       
-      // Buscar mensagens do chat para obter metadata
       const { data: existingMessages, error: msgError } = await supabase
         .from('messages')
         .select('metadata, workspace_id')
@@ -171,7 +158,6 @@ serve(async (req) => {
         throw new Error('Nenhuma mensagem encontrada para este chat');
       }
 
-      // Extrair workspace_id e phone do metadata
       const messageWithWorkspace = existingMessages.find(m => m.workspace_id);
       const messageWithPhone = existingMessages.find(m => m.metadata?.phone);
       
@@ -189,12 +175,10 @@ serve(async (req) => {
         throw new Error('Não foi possível determinar o telefone do destinatário');
       }
 
-      // Verificar se é um grupo (não criar lead para grupos)
       if (chat_id.includes('-group') || chat_id.includes('g.us')) {
         throw new Error('Não é possível enviar mensagens manuais para grupos');
       }
 
-      // Tentar encontrar lead existente pelo phone
       const { data: existingLead } = await supabase
         .from('leads')
         .select('id, phone')
@@ -207,7 +191,6 @@ serve(async (req) => {
         lead_id = existingLead.id;
         destinationPhone = existingLead.phone;
       } else {
-        // Criar novo lead
         console.log('Creating new lead for phone:', phoneFromMetadata);
         const { data: newLead, error: createError } = await supabase
           .from('leads')
@@ -233,7 +216,6 @@ serve(async (req) => {
         lead_id = newLead.id;
         destinationPhone = newLead.phone;
 
-        // Atualizar mensagens antigas para associar ao novo lead
         const { error: updateError } = await supabase
           .from('messages')
           .update({ lead_id: newLead.id })
@@ -253,8 +235,6 @@ serve(async (req) => {
       throw new Error('Não foi possível determinar o destinatário da mensagem');
     }
 
-    // IMPORTANT: Check if lead already has messages with an existing chat_id
-    // This prevents duplicate conversations when WhatsApp uses different chat_id formats
     const { data: existingLeadMessage } = await supabase
       .from('messages')
       .select('chat_id')
@@ -268,13 +248,9 @@ serve(async (req) => {
       chat_id = existingLeadMessage.chat_id;
     }
 
-    // Determine which instance to use:
-    // 1. If providedInstanceId is given (new conversation), use that
-    // 2. Otherwise, find from chat history
     let chatInstanceId = providedInstanceId || null;
     
     if (!chatInstanceId) {
-      // Find the instanceId used for this chat from existing messages metadata
       const { data: existingMessages } = await supabase
         .from('messages')
         .select('metadata')
@@ -289,11 +265,9 @@ serve(async (req) => {
     
     console.log('Using instanceId:', chatInstanceId);
 
-    // Get the correct WhatsApp instance - either by instanceId from chat or fallback to any connected
     let instance;
     
     if (chatInstanceId) {
-      // Get the specific instance that was used for this chat
       const { data: specificInstance, error: specificError } = await supabase
         .from('whatsapp_instances')
         .select('instance_id, instance_token, status')
@@ -312,7 +286,6 @@ serve(async (req) => {
       }
     }
     
-    // Fallback: if no specific instance found, get any connected instance for the workspace
     if (!instance) {
       const { data: fallbackInstance, error: fallbackError } = await supabase
         .from('whatsapp_instances')
@@ -348,10 +321,6 @@ serve(async (req) => {
     let zapiMessageId: string | null = null;
 
     if (isAudioMessage) {
-      // Send audio via Z-API
-      // IMPORTANT:
-      // Sending large base64 payloads inline can lead to truncation and choppy playback in WhatsApp clients.
-      // Instead, we upload the audio to Storage and send a short-lived signed URL to Z-API.
       const mimeType = normalizeMimeType(audio_mime_type, 'audio/webm');
       const ext = guessFileExtensionFromMime(mimeType);
       const objectPath = `outbound/${workspace_id}/${lead_id}/${crypto.randomUUID()}.${ext}`;
@@ -421,7 +390,6 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Keep casing aligned with docs; HTTP header names are case-insensitive.
           'Client-Token': zapiUserToken,
         },
         body: JSON.stringify({
@@ -432,7 +400,6 @@ serve(async (req) => {
         }),
       });
 
-      // Extrair messageId da resposta da Z-API
       try {
         const zapiResult = await zapiResponse.clone().json();
         zapiMessageId = zapiResult.messageId || zapiResult.zapiMessageId || zapiResult.id || null;
@@ -455,7 +422,6 @@ serve(async (req) => {
         throw new Error(`Erro ao enviar áudio: ${zapiResponse.status}`);
       }
 
-      // Save audio message to database
       const { error: insertError } = await supabase
         .from('messages')
         .insert({
@@ -479,8 +445,6 @@ serve(async (req) => {
             audioMimeType: mimeType,
             audioBytes: audioBytes.byteLength,
             audioStoragePath: objectPath,
-            // Helps the UI show a player immediately after sending.
-            // This URL is short-lived; the UI can re-request a fresh one using audioStoragePath.
             mediaUrl: audioUrl,
           }
         });
@@ -493,7 +457,6 @@ serve(async (req) => {
       console.log('Audio message sent successfully');
 
     } else if (isImageMessage) {
-      // Send image via Z-API
       const mimeType = normalizeMimeType(image_mime_type, 'image/jpeg');
       const ext = guessFileExtensionFromMime(mimeType);
       const objectPath = `outbound/${workspace_id}/${lead_id}/${crypto.randomUUID()}.${ext}`;
@@ -563,7 +526,6 @@ serve(async (req) => {
         delayTyping: 1
       };
       
-      // Add caption if provided
       if (image_caption && image_caption.trim()) {
         zapiPayload.caption = image_caption.trim();
       }
@@ -577,7 +539,6 @@ serve(async (req) => {
         body: JSON.stringify(zapiPayload),
       });
 
-      // Extract messageId from Z-API response
       let zapiImageMessageId: string | null = null;
       try {
         const zapiResult = await zapiResponse.clone().json();
@@ -600,10 +561,8 @@ serve(async (req) => {
         throw new Error(`Erro ao enviar imagem: ${zapiResponse.status}`);
       }
 
-      // Determine content to save
       const messageContent = image_caption?.trim() || '📷 Imagem';
 
-      // Save image message to database
       const { error: insertError } = await supabase
         .from('messages')
         .insert({
@@ -637,7 +596,6 @@ serve(async (req) => {
       console.log('Image message sent successfully');
 
     } else if (isDocumentMessage) {
-      // Send document via Z-API
       const mimeType = normalizeMimeType(document_mime_type, 'application/octet-stream');
       const ext = document_extension || guessFileExtensionFromMime(mimeType);
       const objectPath = `outbound/${workspace_id}/${lead_id}/${crypto.randomUUID()}.${ext}`;
@@ -702,7 +660,6 @@ serve(async (req) => {
         caption: document_caption?.slice(0, 50) || '',
       });
       
-      // Z-API send-document endpoint with extension
       const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-document/${ext}`;
       
       const zapiPayload: Record<string, unknown> = {
@@ -712,7 +669,6 @@ serve(async (req) => {
         delayTyping: 1
       };
       
-      // Add caption if provided
       if (document_caption && document_caption.trim()) {
         zapiPayload.caption = document_caption.trim();
       }
@@ -726,7 +682,6 @@ serve(async (req) => {
         body: JSON.stringify(zapiPayload),
       });
 
-      // Extract messageId from Z-API response
       let zapiDocumentMessageId: string | null = null;
       try {
         const zapiResult = await zapiResponse.clone().json();
@@ -749,10 +704,8 @@ serve(async (req) => {
         throw new Error(`Erro ao enviar documento: ${zapiResponse.status}`);
       }
 
-      // Determine content to save
       const messageContent = fileName;
 
-      // Save document message to database
       const { error: insertError } = await supabase
         .from('messages')
         .insert({
@@ -787,8 +740,6 @@ serve(async (req) => {
       console.log('Document message sent successfully');
 
     } else {
-      // Send text message(s)
-      // Split message if needed
       const messageParts = [];
       if (message.length <= MAX_MESSAGE_LENGTH) {
         messageParts.push(message);
@@ -798,11 +749,9 @@ serve(async (req) => {
         }
       }
 
-      // Send each part
       for (let i = 0; i < messageParts.length; i++) {
         const part = messageParts[i];
 
-        // Send via Z-API
         const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-text`;
         
         const zapiResponse = await fetch(zapiUrl, {
@@ -818,7 +767,6 @@ serve(async (req) => {
           }),
         });
 
-        // Extrair messageId da resposta da Z-API
         try {
           const zapiResult = await zapiResponse.clone().json();
           zapiMessageId = zapiResult.messageId || zapiResult.zapiMessageId || zapiResult.id || null;
@@ -829,14 +777,12 @@ serve(async (req) => {
 
         if (!zapiResponse.ok) {
           const errorText = await zapiResponse.text();
-          // Check for disconnected instance error
           if (errorText.includes('disconnected') || errorText.includes('Enqueue message is disabled')) {
             throw new Error('WhatsApp desconectado. Por favor, reconecte sua instância na página Conexões.');
           }
           throw new Error(`Erro ao enviar mensagem: ${zapiResponse.status}`);
         }
 
-        // Save message to database
         const direction = 'outbound_manual';
         console.log('Saving message with direction:', direction);
 
@@ -867,7 +813,6 @@ serve(async (req) => {
 
         console.log(`Sent message part ${i + 1}/${messageParts.length}`);
 
-        // Delay between parts
         if (i < messageParts.length - 1) {
           await new Promise(resolve => setTimeout(resolve, TYPING_DELAY_MS));
         }

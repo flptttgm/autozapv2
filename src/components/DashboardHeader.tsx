@@ -3,7 +3,7 @@ import { useTheme } from "next-themes";
 import {
   Bell, Sparkles, Menu, MessageSquare, Calendar, UserPlus,
   Sun, Moon, Megaphone, BellRing, BellOff, Loader2,
-  ChevronRight, Search, Bot, Hand, Plus,
+  ChevronRight, Search, Bot, Hand, Plus, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,8 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { WorkspaceSwitcher } from "@/components/sidebar/WorkspaceSwitcher";
 import { useAIMode } from "@/hooks/useAIMode";
 import { cn } from "@/lib/utils";
+import { SlGlobe } from "react-icons/sl";
+import { useTranslation } from "react-i18next";
 
 interface Notification {
   id: string;
@@ -53,11 +55,11 @@ interface DashboardHeaderProps {
 }
 
 // ─── Greeting ──────────────────────────────────────────────────
-function getGreeting(): string {
+function getGreeting(t: any): string {
   const h = new Date().getHours();
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  return "Boa noite";
+  if (h < 12) return t("dashboardHeader.goodMorning");
+  if (h < 18) return t("dashboardHeader.goodAfternoon");
+  return t("dashboardHeader.goodEvening");
 }
 
 function getInitials(name: string): string {
@@ -74,6 +76,7 @@ function getInitials(name: string): string {
 const AIModePill = () => {
   const location = useLocation();
   const { currentAIMode, canToggleAIMode, toggleAIMode, isToggling } = useAIMode();
+  const { t } = useTranslation();
 
   // Only render when on conversations page
   if (!location.pathname.startsWith("/conversations")) return null;
@@ -92,7 +95,7 @@ const AIModePill = () => {
         )}
       >
         <Hand className="h-3.5 w-3.5" />
-        Seletivo
+        {t("dashboardHeader.selective")}
       </button>
       <div className="w-px h-5 bg-border/50" />
       <button
@@ -106,7 +109,7 @@ const AIModePill = () => {
         )}
       >
         <Bot className="h-3.5 w-3.5" />
-        Todos
+        {t("dashboardHeader.all")}
       </button>
     </div>
   );
@@ -116,6 +119,7 @@ const AIModePill = () => {
 const ThemeToggle = () => {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => setMounted(true), []);
 
@@ -140,9 +144,45 @@ const ThemeToggle = () => {
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="text-xs">
-        {isDark ? "Modo escuro" : "Modo claro"}
+        {isDark ? t("dashboardHeader.darkMode") : t("dashboardHeader.lightMode")}
       </TooltipContent>
     </Tooltip>
+  );
+};
+
+// ─── Language Toggle ───────────────────────────────────────────
+const LanguageToggle = () => {
+  const { t, i18n } = useTranslation();
+
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200">
+              <SlGlobe className="h-[18px] w-[18px]" />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          {t("dashboardHeader.changeLanguage")}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" className="w-full min-w-[130px] bg-popover/95 backdrop-blur-xl border-border/50 shadow-xl rounded-xl p-1" sideOffset={8}>
+        <DropdownMenuItem
+          className={cn("cursor-pointer rounded-lg", i18n.language.startsWith("pt") && "bg-muted font-medium text-primary")}
+          onClick={() => i18n.changeLanguage("pt")}
+        >
+          {t("dashboardHeader.portuguese")}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={cn("cursor-pointer rounded-lg", i18n.language.startsWith("en") && "bg-muted font-medium text-primary")}
+          onClick={() => i18n.changeLanguage("en")}
+        >
+          {t("dashboardHeader.english")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -158,8 +198,9 @@ export const DashboardHeader = ({
   const location = useLocation();
   const { user, profile } = useAuth();
   const { isSupported, isSubscribed, isLoading, permission, subscribe, unsubscribe } = usePushNotifications();
+  const { t } = useTranslation();
 
-  const displayName = profile?.full_name || profile?.display_name || user?.email?.split("@")[0] || "Usuário";
+  const displayName = profile?.full_name || profile?.display_name || user?.email?.split("@")[0] || t("dashboardHeader.user");
   const firstName = displayName.split(" ")[0];
   const avatarUrl = profile?.avatar_url;
 
@@ -238,8 +279,8 @@ export const DashboardHeader = ({
         setNotifications((prev) => [{
           id: lead.id,
           type: "lead",
-          title: "Novo lead capturado",
-          description: `${lead.name || lead.phone} entrou em contato`,
+          title: t("dashboardHeader.newLeadCaptured"),
+          description: `${lead.name || lead.phone} ${t("dashboardHeader.contacted")}`,
           timestamp: new Date(lead.created_at),
           read: false,
           link: "/leads",
@@ -295,10 +336,10 @@ export const DashboardHeader = ({
   };
 
   const getPushStatusText = () => {
-    if (isLoading) return "Carregando...";
-    if (permission === "denied") return "Bloqueado pelo navegador";
-    if (isSubscribed) return "Ativado";
-    return "Desativado";
+    if (isLoading) return t("dashboardHeader.loading");
+    if (permission === "denied") return t("dashboardHeader.blockedByBrowser");
+    if (isSubscribed) return t("dashboardHeader.enabled");
+    return t("dashboardHeader.disabled");
   };
 
   const getPushIcon = () => {
@@ -335,17 +376,38 @@ export const DashboardHeader = ({
 
       {/* ─── Right: Greeting + Actions ─── */}
       <div className="flex items-center gap-1">
-        {/* Greeting — desktop only, hidden on conversations page */}
-        {!location.pathname.startsWith("/conversations") && (
+        {/* Greeting — desktop only, hidden on conversations and appointments page */}
+        {!location.pathname.startsWith("/conversations") && !location.pathname.startsWith("/appointments") && (
           <div className="hidden md:flex items-center gap-3 min-w-0 mr-3">
             <div className="min-w-0 text-right">
               <p className="text-sm font-semibold text-foreground truncate">
-                {getGreeting()}, <span className="text-primary">{firstName}</span> 👋
+                {getGreeting(t)}, <span className="text-primary">{firstName}</span> 👋
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
                 {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Appointments Actions */}
+        {location.pathname.startsWith("/appointments") && (
+          <div className="hidden sm:flex items-center gap-2 mr-3">
+            <Button
+              variant="outline"
+              className="shadow-sm hover:shadow-md transition-shadow duration-200 h-9 px-3"
+              onClick={() => window.dispatchEvent(new CustomEvent("export-appointments"))}
+            >
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Exportar Agenda</span>
+            </Button>
+            <Button
+              className="shadow-md hover:shadow-lg transition-all duration-200 h-9 px-3"
+              onClick={() => window.dispatchEvent(new CustomEvent("open-create-appointment"))}
+            >
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Novo</span>
+            </Button>
           </div>
         )}
 
@@ -364,13 +426,14 @@ export const DashboardHeader = ({
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
-              Nova conversa
+              {t("dashboardHeader.newConversation")}
             </TooltipContent>
           </Tooltip>
         )}
 
         {/* Theme Toggle */}
         <TooltipProvider delayDuration={200}>
+          <LanguageToggle />
           <ThemeToggle />
 
           {/* ─── Notifications ─── */}
@@ -393,13 +456,13 @@ export const DashboardHeader = ({
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                Notificações
+                {t("dashboardHeader.notifications")}
               </TooltipContent>
             </Tooltip>
 
             <DropdownMenuContent align="end" className="w-[340px] sm:w-96 bg-popover/95 backdrop-blur-xl border-border/50 shadow-xl rounded-xl" sideOffset={8}>
               <div className="flex items-center justify-between px-3 py-2">
-                <DropdownMenuLabel className="p-0 text-sm font-semibold">Notificações</DropdownMenuLabel>
+                <DropdownMenuLabel className="p-0 text-sm font-semibold">{t("dashboardHeader.notifications")}</DropdownMenuLabel>
                 {unreadCount > 0 && (
                   <Button
                     variant="ghost"
@@ -407,7 +470,7 @@ export const DashboardHeader = ({
                     className="text-xs text-primary h-auto py-1 px-2 hover:bg-primary/10"
                     onClick={markAllAsRead}
                   >
-                    Marcar todas como lidas
+                    {t("dashboardHeader.markAllAsRead")}
                   </Button>
                 )}
               </div>
@@ -417,7 +480,7 @@ export const DashboardHeader = ({
                 {notifications.length === 0 ? (
                   <div className="py-8 text-center">
                     <Bell className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
-                    <p className="text-sm text-muted-foreground">Nenhuma notificação</p>
+                    <p className="text-sm text-muted-foreground">{t("dashboardHeader.noNotifications")}</p>
                   </div>
                 ) : (
                   <div className="max-h-[360px] overflow-y-auto">
@@ -459,7 +522,7 @@ export const DashboardHeader = ({
                 className="text-primary cursor-pointer justify-between py-2.5 px-3 rounded-none"
                 onClick={() => navigate("/notifications")}
               >
-                <span className="text-sm font-medium">Ver todas {notifications.length > 0 && `(${notifications.length})`}</span>
+                <span className="text-sm font-medium">{t("dashboardHeader.seeAll")} {notifications.length > 0 && `(${notifications.length})`}</span>
                 <ChevronRight className="h-4 w-4" />
               </DropdownMenuItem>
 
@@ -470,7 +533,7 @@ export const DashboardHeader = ({
                     <div className="flex items-center gap-2.5">
                       {getPushIcon()}
                       <div>
-                        <p className="text-sm font-medium">Push Notifications</p>
+                        <p className="text-sm font-medium">{t("dashboardHeader.pushNotifications")}</p>
                         <p className="text-[11px] text-muted-foreground">{getPushStatusText()}</p>
                       </div>
                     </div>
@@ -502,7 +565,7 @@ export const DashboardHeader = ({
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
-              {aiChatOpen ? "Fechar IA" : "Abrir IA"}
+              {aiChatOpen ? t("dashboardHeader.closeAI") : t("dashboardHeader.openAI")}
             </TooltipContent>
           </Tooltip>
 

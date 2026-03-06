@@ -246,7 +246,7 @@ serve(async (req) => {
 
         // Enable notifySentByMe so messages sent from WhatsApp appear in Autozap
         try {
-          const updateWebhookUrl = `https://api.z-api.io/instances/${instanceId}/token/${instanceToken}/update-webhook-received`;
+          const updateWebhookUrl = `https://api.z-api.io/instances/${instanceId}/token/${instanceToken}/update-webhook-received-delivery`;
           const updateResponse = await fetch(updateWebhookUrl, {
             method: 'PUT',
             headers: {
@@ -259,7 +259,7 @@ serve(async (req) => {
             }),
           });
           const updateResult = await updateResponse.text();
-          console.log(`[create] update-webhook-received (notifySentByMe): status=${updateResponse.status}, response=${updateResult}`);
+          console.log(`[create] update-webhook-received-delivery (notifySentByMe): status=${updateResponse.status}, response=${updateResult}`);
         } catch (webhookUpdateError) {
           // Non-blocking: instance was created successfully, webhook update can be retried
           console.warn('[create] Failed to enable notifySentByMe:', webhookUpdateError);

@@ -40,7 +40,7 @@ export function TimezoneSelector() {
   const updateTimezoneMutation = useMutation({
     mutationFn: async (timezone: string) => {
       const tzInfo = BRAZIL_TIMEZONES.find((tz) => tz.value === timezone);
-      
+
       // Check if config exists
       const { data: existing } = await supabase
         .from("system_config")
@@ -75,7 +75,7 @@ export function TimezoneSelector() {
     onError: (error) => {
       toast.error(
         "Erro ao salvar: " +
-          (error instanceof Error ? error.message : "Erro desconhecido")
+        (error instanceof Error ? error.message : "Erro desconhecido")
       );
     },
   });

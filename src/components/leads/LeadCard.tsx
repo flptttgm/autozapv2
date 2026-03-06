@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatPhoneDisplay, detectPhoneCountry } from "@/lib/phone";
 
 import { AIToggle } from "./AIToggle";
+import { useTranslation } from "react-i18next";
 
 interface LeadCardProps {
   lead: {
@@ -29,54 +30,22 @@ interface LeadCardProps {
   onSelect?: (id: string) => void;
 }
 
-const STATUS_CONFIG = {
-  new: {
-    label: "Novo",
-    bg: "bg-sky-500/10 dark:bg-sky-500/20",
-    text: "text-sky-700 dark:text-sky-300",
-    dot: "bg-sky-500"
-  },
-  contacted: {
-    label: "Contatado",
-    bg: "bg-amber-500/10 dark:bg-amber-500/20",
-    text: "text-amber-700 dark:text-amber-300",
-    dot: "bg-amber-500"
-  },
-  qualified: {
-    label: "Qualificado",
-    bg: "bg-violet-500/10 dark:bg-violet-500/20",
-    text: "text-violet-700 dark:text-violet-300",
-    dot: "bg-violet-500"
-  },
-  proposal: {
-    label: "Proposta",
-    bg: "bg-cyan-500/10 dark:bg-cyan-500/20",
-    text: "text-cyan-700 dark:text-cyan-300",
-    dot: "bg-cyan-500"
-  },
-  negotiation: {
-    label: "Negociação",
-    bg: "bg-orange-500/10 dark:bg-orange-500/20",
-    text: "text-orange-700 dark:text-orange-300",
-    dot: "bg-orange-500"
-  },
-  won: {
-    label: "Fechado",
-    bg: "bg-emerald-500/10 dark:bg-emerald-500/20",
-    text: "text-emerald-700 dark:text-emerald-300",
-    dot: "bg-emerald-500"
-  },
-  lost: {
-    label: "Perdido",
-    bg: "bg-rose-500/10 dark:bg-rose-500/20",
-    text: "text-rose-700 dark:text-rose-300",
-    dot: "bg-rose-500"
-  },
-};
+const getStatusConfig = (t: any) => ({
+  new: { label: t("statusNew"), bg: "bg-sky-500/10 dark:bg-sky-500/20", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500" },
+  contacted: { label: t("statusContacted"), bg: "bg-amber-500/10 dark:bg-amber-500/20", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  qualified: { label: t("statusQualified"), bg: "bg-violet-500/10 dark:bg-violet-500/20", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
+  proposal: { label: t("statusProposal"), bg: "bg-cyan-500/10 dark:bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500" },
+  negotiation: { label: t("statusNegotiation"), bg: "bg-orange-500/10 dark:bg-orange-500/20", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
+  won: { label: t("statusConverted"), bg: "bg-emerald-500/10 dark:bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+  lost: { label: t("statusLost"), bg: "bg-rose-500/10 dark:bg-rose-500/20", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500" },
+});
 
 export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect }: LeadCardProps) => {
+  const { t, i18n } = useTranslation("leads");
+  const STATUS_CONFIG = getStatusConfig(t);
+
   const [imageError, setImageError] = useState(false);
-  const displayName = (lead.name || "Sem nome").replace(/^Grupo:\s*/i, "");
+  const displayName = (lead.name || t("noName")).replace(/^Grupo:\s*/i, "");
   const initials = displayName
     .split(" ")
     .slice(0, 2)
@@ -96,7 +65,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
   };
 
   const formattedDate = lead.created_at
-    ? new Date(lead.created_at).toLocaleDateString("pt-BR", {
+    ? new Date(lead.created_at).toLocaleDateString(i18n.language === 'pt' ? "pt-BR" : "en-US", {
       day: "2-digit",
       month: "short",
       year: "numeric"
@@ -171,7 +140,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
                   )}
                 </div>
                 {isGroup && (
-                  <span className="text-xs text-muted-foreground">Grupo</span>
+                  <span className="text-xs text-muted-foreground">{t("groupText")}</span>
                 )}
                 {/* Badges row */}
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">

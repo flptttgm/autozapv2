@@ -1075,25 +1075,36 @@ const MemoizedChatContent = memo(function ChatContent({
 
         {/* AI Paused Banner */}
         {isAIPaused && (
-          <div className="bg-amber-500/15 border-b border-amber-500/30 px-3 sm:px-4 py-2 sm:py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-              <span className="font-medium text-xs sm:text-sm">
-                IA pausada neste chat (Hands On)
-              </span>
+          <div className="relative overflow-hidden bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-500/20 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[inset_0_-1px_0_rgba(245,158,11,0.1)]">
+            {/* Subtle glow effect */}
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent opacity-50 pointer-events-none" />
+
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/20 shrink-0">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-semibold text-amber-800 dark:text-amber-300 text-sm tracking-tight">
+                  Automação Pausada (Modo Manual)
+                </span>
+                <span className="text-xs text-amber-700/80 dark:text-amber-400/80 font-medium mt-0.5">
+                  Você está no controle deste atendimento.
+                </span>
+              </div>
             </div>
+
             <Button
               size="sm"
               onClick={() => toggleAIPauseMutation.mutate(false)}
               disabled={toggleAIPauseMutation.isPending}
-              className="bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto text-xs sm:text-sm"
+              className="relative z-10 bg-amber-500 hover:bg-amber-600 text-white shadow-sm hover:shadow-md hover:shadow-amber-500/20 w-full sm:w-auto text-xs font-semibold tracking-wide transition-all border border-amber-600/50"
             >
               {toggleAIPauseMutation.isPending ? (
-                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
               ) : (
-                <Bot className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <Bot className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Reativar
+              Reativar IA
             </Button>
           </div>
         )}
@@ -1168,11 +1179,14 @@ const MemoizedChatContent = memo(function ChatContent({
                             </div>
                           )}
                           <Card
-                            className={`p-3 rounded-2xl shadow-sm ${msg.direction === "inbound"
-                              ? "bg-card/80 backdrop-blur-sm border-border/50 rounded-tl-sm"
-                              : msg.direction === "outbound_manual"
-                                ? "bg-secondary/60 backdrop-blur-sm border-secondary/50 rounded-tr-sm"
-                                : "bg-primary/90 dark:bg-primary/80 text-primary-foreground border-primary/50 shadow-primary/10 rounded-tr-sm"
+                            className={`rounded-2xl ${msg.message_type === "sticker"
+                              ? "bg-transparent p-0 shadow-none border-none"
+                              : `p-3 shadow-sm ${msg.direction === "inbound"
+                                ? "bg-card/80 backdrop-blur-sm border-border/50 rounded-tl-sm"
+                                : msg.direction === "outbound_manual"
+                                  ? "bg-secondary/60 backdrop-blur-sm border-secondary/50 rounded-tr-sm"
+                                  : "bg-primary/90 dark:bg-primary/80 text-primary-foreground border-primary/50 shadow-primary/10 rounded-tr-sm"
+                              }`
                               }`}
                           >
                             <div className="text-sm whitespace-pre-wrap break-words prose prose-sm dark:prose-invert max-w-none prose-p:m-0 prose-p:leading-relaxed prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5">
@@ -1291,18 +1305,25 @@ const MemoizedChatContent = memo(function ChatContent({
                                   <span>{msg.content}</span>
                                 </div>
                               ) : msg.message_type === "sticker" ? (
-                                <div className="flex items-center gap-2">
-                                  <span>🎨</span>
-                                  {(msg.metadata as any)?.mediaUrl ? (
-                                    <img
-                                      src={(msg.metadata as any).mediaUrl}
-                                      alt="Sticker"
-                                      className="max-w-[120px] max-h-[120px]"
-                                    />
-                                  ) : (
-                                    <span>{msg.content}</span>
-                                  )}
-                                </div>
+                                (() => {
+                                  const stickerUrl = (msg.metadata as any)?.mediaUrl || (msg.metadata as any)?.zapi_payload?.sticker?.stickerUrl;
+                                  return (
+                                    <div className="flex items-center justify-center relative group">
+                                      {stickerUrl ? (
+                                        <img
+                                          src={stickerUrl}
+                                          alt="Sticker"
+                                          className="max-w-[180px] max-h-[180px] w-auto h-auto drop-shadow-sm transition-transform group-hover:scale-[1.02]"
+                                        />
+                                      ) : (
+                                        <div className="flex items-center gap-2 bg-card border shadow-sm p-3 text-card-foreground rounded-2xl">
+                                          <span>🎨</span>
+                                          <span>{msg.content}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()
                               ) : (
                                 <MarkdownWithAppleEmoji content={msg.content} />
                               )}
@@ -2361,9 +2382,17 @@ const Conversations = () => {
       });
 
       if (error) {
-        // Extract actual error message from response
-        const errorMessage =
-          (data as any)?.error || error.message || "Erro desconhecido";
+        let errorMessage = "Erro desconhecido";
+        try {
+          if (error.context) {
+            const errorBody = await error.context.json();
+            errorMessage = errorBody.error || error.message || errorMessage;
+          } else {
+            errorMessage = (data as any)?.error || error.message || errorMessage;
+          }
+        } catch (e) {
+          errorMessage = error.message || errorMessage;
+        }
         throw new Error(errorMessage);
       }
       return data;

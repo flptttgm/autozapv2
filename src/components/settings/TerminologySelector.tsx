@@ -6,41 +6,43 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { Contact, Users, TrendingUp, Heart, Loader2 } from "lucide-react";
 import { useTerminology, TerminologyType } from "@/hooks/useTerminology";
-
-const TERMINOLOGY_OPTIONS = [
-  {
-    value: "contatos" as TerminologyType,
-    label: "Contatos",
-    description: "Para agendas e networking",
-    icon: Contact,
-  },
-  {
-    value: "clientes" as TerminologyType,
-    label: "Clientes",
-    description: "Padrão para negócios em geral",
-    icon: Users,
-  },
-  {
-    value: "leads" as TerminologyType,
-    label: "Leads",
-    description: "Para vendas e marketing",
-    icon: TrendingUp,
-  },
-  {
-    value: "pacientes" as TerminologyType,
-    label: "Pacientes",
-    description: "Para área da saúde",
-    icon: Heart,
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export const TerminologySelector = () => {
   const queryClient = useQueryClient();
   const { type, isLoading, ownerWorkspaceId } = useTerminology();
+  const { t } = useTranslation("settings");
+
+  const TERMINOLOGY_OPTIONS = [
+    {
+      value: "contatos" as TerminologyType,
+      label: t("contacts"),
+      description: t("contactsDescription"),
+      icon: Contact,
+    },
+    {
+      value: "clientes" as TerminologyType,
+      label: t("clients"),
+      description: t("clientsDescription"),
+      icon: Users,
+    },
+    {
+      value: "leads" as TerminologyType,
+      label: t("leadsLabel"),
+      description: t("leadsDescription"),
+      icon: TrendingUp,
+    },
+    {
+      value: "pacientes" as TerminologyType,
+      label: t("patients"),
+      description: t("patientsDescription"),
+      icon: Heart,
+    },
+  ];
 
   const updateMutation = useMutation({
     mutationFn: async (newType: TerminologyType) => {
-      if (!ownerWorkspaceId) throw new Error("Workspace não encontrado");
+      if (!ownerWorkspaceId) throw new Error(t("workspaceNotFound"));
 
       // Check if config exists for the owner's primary workspace
       const { data: existing } = await supabase
@@ -74,7 +76,7 @@ export const TerminologySelector = () => {
       return newType;
     },
     onSuccess: async () => {
-      toast.success("Terminologia atualizada!");
+      toast.success(t("terminologyUpdated"));
 
       // Invalidate all terminology-related queries
       await queryClient.invalidateQueries({ queryKey: ["terminology_config"] });
@@ -85,7 +87,7 @@ export const TerminologySelector = () => {
       }, 300);
     },
     onError: (error) => {
-      toast.error("Erro ao salvar: " + (error instanceof Error ? error.message : "Erro desconhecido"));
+      toast.error(t("saveError") + ": " + (error instanceof Error ? error.message : t("unknownError")));
     },
   });
 
@@ -105,14 +107,14 @@ export const TerminologySelector = () => {
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Aplicando...</span>
+            <span>{t("applying")}</span>
           </div>
         </div>
       )}
 
-      <h2 className="text-xl sm:text-2xl font-semibold mb-2">Terminologia</h2>
+      <h2 className="text-xl sm:text-2xl font-semibold mb-2">{t("terminology")}</h2>
       <p className="text-muted-foreground mb-6 text-sm sm:text-base">
-        Escolha como deseja chamar seus contatos na plataforma
+        {t("terminologyDescription")}
       </p>
 
       <RadioGroup
@@ -132,8 +134,8 @@ export const TerminologySelector = () => {
               key={option.value}
               htmlFor={option.value}
               className={`flex flex-col items-center gap-3 p-4 border rounded-lg transition-all ${isPending
-                  ? "cursor-not-allowed opacity-60"
-                  : "cursor-pointer"
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer"
                 } ${type === option.value
                   ? "border-primary bg-primary/5 ring-2 ring-primary"
                   : "border-border hover:border-primary/50"
@@ -156,7 +158,7 @@ export const TerminologySelector = () => {
       </RadioGroup>
 
       <p className="text-sm text-muted-foreground mt-4">
-        💡 Essa configuração altera o nome da página e menus em todos os workspaces
+        {t("terminologyHint")}
       </p>
     </Card>
   );

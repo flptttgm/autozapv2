@@ -24,6 +24,7 @@ interface WhatsAppInstance {
   phone: string | null;
   connected_at: string | null;
   created_at: string;
+  updated_at?: string;
   subscribed: boolean | null;
   ai_mode?: "all" | "selective";
 }
@@ -46,7 +47,7 @@ const WhatsApp = () => {
     try {
       const { data, error } = await supabase
         .from('whatsapp_instances')
-        .select('id, instance_id, instance_token, workspace_id, status, phone, connected_at, created_at, subscribed, ai_mode, message_buffer_seconds')
+        .select('id, instance_id, instance_token, workspace_id, status, phone, connected_at, created_at, updated_at, subscribed, ai_mode, message_buffer_seconds')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: true });
 

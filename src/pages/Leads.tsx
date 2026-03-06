@@ -56,6 +56,7 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 import { useTerminology } from "@/hooks/useTerminology";
+import { useTranslation } from "react-i18next";
 import {
   useLeadsSortPreference,
   LeadsSortOrder,
@@ -80,12 +81,19 @@ import {
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const leadSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório").max(100),
-  phone: z.string().min(10, "Telefone deve ter no mínimo 10 dígitos").max(20),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+const getLeadSchema = (t: any) => z.object({
+  name: z.string().min(1, t("nameRequired")).max(100),
+  phone: z.string().min(10, t("phoneMinLength")).max(20),
+  email: z.string().email(t("invalidEmail")).optional().or(z.literal("")),
   status: z.enum(["new", "contacted", "qualified", "converted", "lost"]),
 });
+
+type LeadFormValues = {
+  name: string;
+  phone: string;
+  email?: string;
+  status: "new" | "contacted" | "qualified" | "converted" | "lost";
+};
 
 const ITEMS_PER_PAGE = 20;
 
@@ -132,8 +140,11 @@ const Leads = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const { terminology } = useTerminology();
+  const { t } = useTranslation("leads");
   const { sortOrder, setSortOrder } = useLeadsSortPreference();
   const navigate = useNavigate();
+
+  const leadSchema = getLeadSchema(t);
 
   // Folder access control
   const { allowedFolderIds, isAdmin: canManageTeam } = useLeadFolderAccess();
@@ -158,7 +169,7 @@ const Leads = () => {
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof leadSchema>) => {
+    mutationFn: async (data: LeadFormValues) => {
       // Normalize phone: ensure country code 55 prefix
       let normalizedPhone = data.phone.replace(/\D/g, '');
       if (!normalizedPhone.startsWith('55')) {
@@ -176,13 +187,13 @@ const Leads = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success(`${terminology.singular} criado com sucesso!`);
+      toast.success(t("createdSuccess", { entity: terminology.singular }));
       setIsDialogOpen(false);
       setFormData({ name: "", phone: "", email: "", status: "new" });
       setFormErrors({});
     },
     onError: () => {
-      toast.error(`Erro ao criar ${terminology.singularLower}`);
+      toast.error(t("createError", { entity: terminology.singularLower }));
     },
   });
 
@@ -197,15 +208,16 @@ const Leads = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success(
-        `${selectedLeads.size} ${selectedLeads.size === 1 ? terminology.singularLower : terminology.pluralLower} excluído(s) com sucesso!`,
-      );
+      toast.success(t("deletedSuccess", {
+        count: selectedLeads.size,
+        entity: selectedLeads.size === 1 ? terminology.singularLower : terminology.pluralLower
+      }));
       setSelectedLeads(new Set());
       setIsSelectionMode(false);
       setShowDeleteDialog(false);
     },
     onError: () => {
-      toast.error("Erro ao excluir leads");
+      toast.error(t("deleteError"));
     },
   });
 
@@ -220,7 +232,7 @@ const Leads = () => {
       return;
     }
     setFormErrors({});
-    createLeadMutation.mutate(result.data);
+    createLeadMutation.mutate(result.data as LeadFormValues);
   };
 
   // Build query filters - shared between count and data queries
@@ -413,12 +425,13 @@ const Leads = () => {
 
       const allIds = new Set(data?.map((l) => l.id) || []);
       setSelectedLeads(allIds);
-      toast.success(
-        `${allIds.size.toLocaleString("pt-BR")} ${terminology.pluralLower} selecionados`,
-      );
+      toast.success(t("selectedCount", {
+        count: allIds.size,
+        suffix: allIds.size > 1 ? "s" : ""
+      }));
     } catch (error) {
       console.error("Error selecting all leads:", error);
-      toast.error("Erro ao selecionar todos os leads");
+      toast.error(t("selectAllError"));
     } finally {
       setIsSelectingAll(false);
     }
@@ -429,12 +442,12 @@ const Leads = () => {
 
     const headers = ["Nome", "Telefone", "Email", "Status", "Criado em"];
     const statusLabels: Record<string, string> = {
-      new: "Novo",
-      prospect: "Prospecção",
-      contacted: "Contatado",
-      qualified: "Qualificado",
-      converted: "Convertido",
-      lost: "Perdido",
+      new: t("statusNew"),
+      prospect: t("statusProspect"),
+      contacted: t("statusContacted"),
+      qualified: t("statusQualified"),
+      converted: t("statusConverted"),
+      lost: t("statusLost"),
     };
 
     const escapeCSV = (value: string) => {
@@ -470,7 +483,7 @@ const Leads = () => {
     URL.revokeObjectURL(url);
 
     toast.success(
-      `${selectedLeadsData.length} ${terminology.pluralLower} exportados com sucesso!`,
+      t("exportedSuccess", { count: selectedLeadsData.length, entity: terminology.pluralLower })
     );
   };
 
@@ -560,16 +573,16 @@ const Leads = () => {
               <DropdownMenuContent align="end" className="w-[200px] glass border-border/50 rounded-xl mt-1.5 p-1 animate-in zoom-in-95 data-[state=closed]:zoom-out-95 shadow-xl">
                 <DropdownMenuItem onClick={toggleSelectionMode} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
                   {isSelectionMode ? <X className="h-4 w-4 text-muted-foreground mr-1" /> : <CheckSquare className="h-4 w-4 text-muted-foreground mr-1" />}
-                  {isSelectionMode ? "Cancelar Seleção" : "Em massa"}
+                  {isSelectionMode ? t("cancelSelection") : t("bulkActions")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/leads/prospect")} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
                   <Search className="h-4 w-4 text-muted-foreground mr-1" />
-                  Prospectar
+                  {t("prospect")}
                 </DropdownMenuItem>
                 <div className="h-[1px] bg-border/50 my-1 mx-2" />
                 <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="gap-2 py-2.5 px-3 font-medium cursor-pointer rounded-lg hover:bg-muted focus:bg-muted outline-none">
                   <Upload className="h-4 w-4 text-muted-foreground mr-1" />
-                  Importar Lista
+                  {t("importList")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -581,12 +594,12 @@ const Leads = () => {
               {isSelectionMode ? (
                 <>
                   <X className="h-4 w-4 mr-2" />
-                  Cancelar
+                  {t("cancel")}
                 </>
               ) : (
                 <>
                   <CheckSquare className="h-4 w-4 mr-2" />
-                  Selecionar
+                  {t("select")}
                 </>
               )}
             </Button>
@@ -595,14 +608,14 @@ const Leads = () => {
               onClick={() => navigate("/leads/prospect")}
             >
               <Search className="h-4 w-4 mr-2" />
-              Prospectar
+              {t("prospect")}
             </Button>
             <Button
               variant="outline"
               onClick={() => setIsImportDialogOpen(true)}
             >
               <Upload className="h-4 w-4 mr-2" />
-              Importar
+              {t("import")}
             </Button>
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -646,12 +659,12 @@ const Leads = () => {
 
               if (error) throw error;
 
-              toast.success("Pasta excluída com sucesso!");
+              toast.success(t("folderDeletedSuccess"));
               queryClient.invalidateQueries({ queryKey: ["leads"] });
               queryClient.invalidateQueries({ queryKey: ["lead-folders"] });
               queryClient.invalidateQueries({ queryKey: ["leads-counts"] });
             } catch (err: any) {
-              toast.error(err.message || "Erro ao excluir pasta");
+              toast.error(err.message || t("folderDeleteError"));
             }
           }}
           totalLeadsCount={totalLeadsCount}
@@ -665,21 +678,21 @@ const Leads = () => {
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 w-full sm:w-auto px-4 sm:px-0">
             <div className="flex flex-wrap justify-center sm:flex-nowrap items-center gap-1.5 sm:gap-2 py-3 px-4 sm:px-5 glass rounded-2xl sm:rounded-full shadow-2xl border border-border/50 bg-background/80 backdrop-blur-md">
               <span className="text-sm font-semibold text-foreground px-2 flex-grow sm:flex-grow-0 text-center sm:text-left mb-2 sm:mb-0 w-full sm:w-auto">
-                {selectedLeads.size} selecionado{selectedLeads.size > 1 ? "s" : ""}
+                {t("selectedCount", { count: selectedLeads.size, suffix: selectedLeads.size > 1 ? "s" : "" })}
               </span>
               <div className="hidden sm:block h-5 w-[1px] bg-border/80 mx-1"></div>
 
               <div className="flex flex-wrap sm:flex-nowrap justify-center gap-1.5 sm:gap-2 w-full sm:w-auto">
                 <Button variant="ghost" size="sm" className="rounded-full h-9 hover:bg-muted/80 text-xs sm:text-sm" onClick={selectAll}>
                   {isSelectingAll
-                    ? "Selecionando..."
+                    ? t("selecting")
                     : allSelected
-                      ? "Desselecionar"
-                      : `Todos (${totalItems.toLocaleString("pt-BR")})`}
+                      ? t("deselectAll")
+                      : t("allCount", { count: totalItems })}
                 </Button>
                 <Button variant="ghost" size="sm" className="rounded-full h-9 hover:bg-muted/80 text-xs sm:text-sm" onClick={exportSelectedToCSV}>
                   <Download className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Exportar</span>
+                  <span className="hidden sm:inline">{t("export")}</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -688,7 +701,7 @@ const Leads = () => {
                   onClick={() => setShowMoveToFolderDialog(true)}
                 >
                   <FolderInput className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Mover</span>
+                  <span className="hidden sm:inline">{t("move")}</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -697,11 +710,11 @@ const Leads = () => {
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   <Trash2 className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Excluir</span>
+                  <span className="hidden sm:inline">{t("delete")}</span>
                 </Button>
                 <Button variant="default" size="sm" className="rounded-full h-9 shadow-md shadow-primary/20 text-xs sm:text-sm" onClick={handleSendMessage}>
                   <MessageSquare className="h-4 w-4 mr-1.5" />
-                  Mensagem
+                  {t("message")}
                 </Button>
               </div>
             </div>
@@ -713,7 +726,7 @@ const Leads = () => {
           {/* Search input */}
           <div className="relative flex-1">
             <Input
-              placeholder="Buscar por nome, telefone ou email..."
+              placeholder={t("searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full rounded-xl sm:rounded-lg h-12 sm:h-10 pl-4 pr-12 bg-card/50 backdrop-blur-sm border-border/50 focus:bg-background transition-colors"
@@ -729,41 +742,41 @@ const Leads = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/50 text-muted-foreground">
                     <Filter className="h-4 w-4 mr-2" />
-                    Filtros e Ordenação
+                    {t("filtersAndSorting")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-[calc(100vw-2rem)] mx-4 p-4 glass border-border/50 rounded-xl space-y-5 animate-in slide-in-from-bottom-2 shadow-xl">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">Status</Label>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">{t("status")}</Label>
                     <Select value={statusFilter} onValueChange={handleFilterChange}>
                       <SelectTrigger className="rounded-xl h-12 w-full bg-background/50 border-border/60">
-                        <SelectValue placeholder="Todos os tipos" />
+                        <SelectValue placeholder={t("allTypes")} />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        <SelectItem value="all">Todos os tipos</SelectItem>
-                        <SelectItem value="favorites">⭐ Favoritos</SelectItem>
-                        <SelectItem value="new">Novo</SelectItem>
-                        <SelectItem value="prospect">Prospecção</SelectItem>
-                        <SelectItem value="contacted">Contatado</SelectItem>
-                        <SelectItem value="qualified">Qualificado</SelectItem>
-                        <SelectItem value="converted">Convertido</SelectItem>
-                        <SelectItem value="lost">Perdido</SelectItem>
+                        <SelectItem value="all">{t("allTypes")}</SelectItem>
+                        <SelectItem value="favorites">{t("favorites")}</SelectItem>
+                        <SelectItem value="new">{t("statusNew")}</SelectItem>
+                        <SelectItem value="prospect">{t("statusProspect")}</SelectItem>
+                        <SelectItem value="contacted">{t("statusContacted")}</SelectItem>
+                        <SelectItem value="qualified">{t("statusQualified")}</SelectItem>
+                        <SelectItem value="converted">{t("statusConverted")}</SelectItem>
+                        <SelectItem value="lost">{t("statusLost")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">Ordenação</Label>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold ml-1">{t("sort")}</Label>
                     <Select value={sortOrder} onValueChange={(v: LeadsSortOrder) => setSortOrder(v)}>
                       <SelectTrigger className="rounded-xl h-12 w-full bg-background/50 border-border/60">
                         <div className="flex items-center gap-2">
                           <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                          <SelectValue placeholder="Mais recentes" />
+                          <SelectValue placeholder={t("mostRecent")} />
                         </div>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        <SelectItem value="recent">Mais recentes</SelectItem>
-                        <SelectItem value="alphabetical">Ordem alfabética</SelectItem>
-                        <SelectItem value="score">Maior score</SelectItem>
+                        <SelectItem value="recent">{t("mostRecent")}</SelectItem>
+                        <SelectItem value="alphabetical">{t("alphabetical")}</SelectItem>
+                        <SelectItem value="score">{t("highestScore")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -775,17 +788,17 @@ const Leads = () => {
             <div className="hidden sm:flex gap-3">
               <Select value={statusFilter} onValueChange={handleFilterChange}>
                 <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
-                  <SelectValue placeholder="Todos os tipos" />
+                  <SelectValue placeholder={t("allTypes")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  <SelectItem value="favorites">⭐ Favoritos</SelectItem>
-                  <SelectItem value="new">Novo</SelectItem>
-                  <SelectItem value="prospect">Prospecção</SelectItem>
-                  <SelectItem value="contacted">Contatado</SelectItem>
-                  <SelectItem value="qualified">Qualificado</SelectItem>
-                  <SelectItem value="converted">Convertido</SelectItem>
-                  <SelectItem value="lost">Perdido</SelectItem>
+                  <SelectItem value="all">{t("allTypes")}</SelectItem>
+                  <SelectItem value="favorites">{t("favorites")}</SelectItem>
+                  <SelectItem value="new">{t("statusNew")}</SelectItem>
+                  <SelectItem value="prospect">{t("statusProspect")}</SelectItem>
+                  <SelectItem value="contacted">{t("statusContacted")}</SelectItem>
+                  <SelectItem value="qualified">{t("statusQualified")}</SelectItem>
+                  <SelectItem value="converted">{t("statusConverted")}</SelectItem>
+                  <SelectItem value="lost">{t("statusLost")}</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -795,7 +808,7 @@ const Leads = () => {
                 <SelectTrigger className="rounded-xl sm:rounded-lg h-12 sm:h-10 w-full sm:w-44 bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/80 transition-colors">
                   <div className="flex items-center gap-2">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Mais recentes" />
+                    <SelectValue placeholder={t("mostRecent")} />
                   </div>
                 </SelectTrigger>
                 <SelectContent>
@@ -893,8 +906,7 @@ const Leads = () => {
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 animate-in fade-in duration-500">
                 <p className="text-sm text-muted-foreground font-medium">
-                  Mostrando {startIndex + 1}-{endIndex} de{" "}
-                  {totalItems.toLocaleString("pt-BR")} resultados
+                  {t("showingResults", { start: startIndex + 1, end: endIndex, total: totalItems })}
                 </p>
                 <Pagination>
                   <PaginationContent>
@@ -956,18 +968,18 @@ const Leads = () => {
                 <div className="h-2.5 w-2.5 bg-primary rounded-full relative z-10"></div>
               </div>
             </div>
-            <h3 className="text-2xl font-bold mb-3 tracking-tight">Nenhum {terminology.singularLower} encontrado</h3>
+            <h3 className="text-2xl font-bold mb-3 tracking-tight">{t("noneFound", { entity: terminology.singularLower })}</h3>
             <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
-              Sua lista de {terminology.pluralLower} está vazia ou os filtros aplicados não retornaram resultados. Adicione um novo contato ou importe uma lista.
+              {t("emptyStateDescription", { entity: terminology.pluralLower })}
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto rounded-xl shadow-lg shadow-primary/25 h-12 px-8 font-medium transition-all hover:scale-[1.02]">
                 <Plus className="h-4 w-4 mr-2" />
-                Criar {terminology.singular}
+                {t("createEntity", { entity: terminology.singular })}
               </Button>
               <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="w-full sm:w-auto rounded-xl h-12 px-8 font-medium transition-all hover:scale-[1.02] border-border/60 hover:bg-muted/50">
                 <Upload className="h-4 w-4 mr-2" />
-                Importar Lista
+                {t("importList")}
               </Button>
             </div>
           </div>
@@ -977,23 +989,22 @@ const Leads = () => {
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogTitle>{t("deleteConfirmation")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir {selectedLeads.size}{" "}
-                {selectedLeads.size === 1
-                  ? terminology.singularLower
-                  : terminology.pluralLower}
-                ? Esta ação não pode ser desfeita.
+                {t("deleteWarning", {
+                  count: selectedLeads.size,
+                  entity: selectedLeads.size === 1 ? terminology.singularLower : terminology.pluralLower
+                })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteSelected}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={deleteLeadsMutation.isPending}
               >
-                {deleteLeadsMutation.isPending ? "Excluindo..." : "Excluir"}
+                {deleteLeadsMutation.isPending ? t("deleting") : t("delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

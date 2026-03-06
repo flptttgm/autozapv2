@@ -140,8 +140,8 @@ export const WeeklyAppointmentCard = ({
 
   const isFromWhatsApp = appointment.source === 'ai';
   const wasCancelledByWhatsApp = appointment.metadata?.cancelled_by === 'customer_whatsapp';
-  const wasRescheduledByWhatsApp = appointment.metadata?.rescheduled_from_whatsapp || 
-                                    appointment.metadata?.reschedule_requested_by === 'customer_whatsapp';
+  const wasRescheduledByWhatsApp = appointment.metadata?.rescheduled_from_whatsapp ||
+    appointment.metadata?.reschedule_requested_by === 'customer_whatsapp';
 
   const handleExport = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -167,8 +167,9 @@ export const WeeklyAppointmentCard = ({
           }}
           onClick={() => onClick?.(appointment)}
           className={cn(
-            "group relative rounded-xl cursor-pointer transition-all duration-200 h-full overflow-hidden",
-            "hover:scale-[1.02] hover:z-20",
+            "group relative rounded-xl cursor-pointer transition-all duration-300 h-full overflow-hidden",
+            "ring-1 ring-white/20",
+            "hover:scale-[1.03] hover:z-20 hover:ring-white/30",
             config.gradient,
             config.shadow,
             config.hoverShadow,
@@ -223,12 +224,14 @@ export const WeeklyAppointmentCard = ({
               <StatusIcon className="h-2.5 w-2.5" />
             </div>
           )}
-          {/* Subtle shine effect on hover */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+          {/* Glass inner highlight - top edge */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
+          {/* Shimmer sweep on hover */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out pointer-events-none" />
         </motion.div>
       </TooltipTrigger>
-      <TooltipContent 
-        side="right" 
+      <TooltipContent
+        side="right"
         sideOffset={12}
         className={cn(
           "max-w-xs p-4 z-[100] shadow-2xl border-l-4",
@@ -266,7 +269,7 @@ export const WeeklyAppointmentCard = ({
             <Clock className="h-4 w-4" />
             <span className="font-medium">{startTime} - {endTime}</span>
           </div>
-          
+
           {/* WhatsApp cancellation info */}
           {wasCancelledByWhatsApp && (
             <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800">
@@ -281,7 +284,7 @@ export const WeeklyAppointmentCard = ({
               )}
             </div>
           )}
-          
+
           {/* WhatsApp reschedule info */}
           {wasRescheduledByWhatsApp && (
             <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md border border-amber-200 dark:border-amber-800">
@@ -296,7 +299,7 @@ export const WeeklyAppointmentCard = ({
               )}
             </div>
           )}
-          
+
           {appointment.description && (
             <p className="text-sm text-muted-foreground border-t border-border pt-3">{appointment.description}</p>
           )}

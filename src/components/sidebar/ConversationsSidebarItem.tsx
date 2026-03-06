@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
+import { useTranslation } from "react-i18next";
 
 interface ConversationsSidebarItemProps {
   collapsed: boolean;
@@ -18,6 +19,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
 
@@ -92,7 +94,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
   };
 
   const formatPhone = (phone: string | null) => {
-    if (!phone) return "Sem número";
+    if (!phone) return t("sidebar.noNumber");
     return phone.replace(/^55/, "+55 ");
   };
 
@@ -119,7 +121,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right" className="flex flex-col gap-1">
-          <span className="font-medium">Conversas</span>
+          <span className="font-medium">{t("sidebar.conversations")}</span>
           {instances && instances.length > 0 && (
             <div className="text-xs text-muted-foreground">
               {instances.map((inst) => (
@@ -155,7 +157,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
           "shrink-0 transition-all duration-200 ease-out",
           isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
         )} />
-        <span className="flex-1 text-left">Conversas</span>
+        <span className="flex-1 text-left">{t("sidebar.conversations")}</span>
         {totalUnread > 0 && (
           <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
             {totalUnread > 99 ? "99+" : totalUnread}
@@ -182,7 +184,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
             "shrink-0 transition-all duration-200 ease-out",
             isParentActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
           )} />
-          <span className="flex-1 text-left">Conversas</span>
+          <span className="flex-1 text-left">{t("sidebar.conversations")}</span>
           {totalUnread > 0 && (
             <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
               {totalUnread > 99 ? "99+" : totalUnread}
@@ -207,7 +209,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
               : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
           )}
         >
-          <span className="flex-1">Todas</span>
+          <span className="flex-1">{t("sidebar.all")}</span>
           {totalUnread > 0 && (
             <span className="text-xs text-muted-foreground">({totalUnread})</span>
           )}
@@ -244,7 +246,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
 
         {(!instances || instances.length === 0) && (
           <div className="px-3 py-1.5 text-xs text-muted-foreground italic">
-            Nenhuma instância conectada
+            {t("sidebar.noConnectedInstance")}
           </div>
         )}
       </CollapsibleContent>

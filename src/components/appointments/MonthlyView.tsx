@@ -112,7 +112,7 @@ export const MonthlyView = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 sm:p-4 border-b border-border bg-muted/30">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 sm:p-4 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="flex items-center gap-1 sm:gap-2">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
             <ChevronLeft className="h-4 w-4" />
@@ -131,7 +131,7 @@ export const MonthlyView = ({
       </div>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b border-border bg-muted/20">
+      <div className="grid grid-cols-7 border-b border-border/50 bg-muted/10">
         {weekDays.map((dayName) => (
           <div
             key={dayName}
@@ -161,11 +161,11 @@ export const MonthlyView = ({
                 transition={{ duration: 0.2, delay: idx * 0.008 }}
                 onClick={() => onSelectDate(dayDate)}
                 className={cn(
-                  "border-r border-b border-border p-1 cursor-pointer transition-colors min-h-[60px] sm:min-h-[80px] md:min-h-[100px]",
-                  "hover:bg-muted/50 overflow-hidden",
-                  !isCurrentMonth && "bg-muted/20",
-                  isSelected && "bg-primary/5 ring-2 ring-primary ring-inset",
-                  isTodayDate && !isSelected && "bg-primary/10"
+                  "border-r border-b border-border/40 p-1 cursor-pointer transition-all duration-200 min-h-[60px] sm:min-h-[80px] md:min-h-[100px]",
+                  "hover:bg-primary/5 overflow-hidden",
+                  !isCurrentMonth && "bg-muted/10",
+                  isSelected && "bg-primary/5 ring-2 ring-primary/60 ring-inset shadow-inner",
+                  isTodayDate && !isSelected && "bg-primary/[0.06]"
                 )}
               >
                 {/* Day number */}
@@ -273,7 +273,7 @@ const AppointmentPill = ({
           }}
           className={cn(
             "px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate cursor-pointer",
-            "shadow-sm hover:shadow-md transition-shadow",
+            "shadow-sm hover:shadow-md transition-all duration-200 ring-1 ring-white/20",
             statusGradients[status] || statusGradients.scheduled
           )}
         >

@@ -65,6 +65,7 @@ interface WhatsAppInstance {
   phone: string | null;
   connected_at: string | null;
   created_at: string;
+  updated_at?: string;
   display_name?: string | null;
   ai_template_id?: string | null;
   is_paused?: boolean;
@@ -696,6 +697,11 @@ export const WhatsAppInstanceCard = ({
                 <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
                   Automações pausadas por falta de assinatura
                 </p>
+                {instance.updated_at && (
+                  <p className="text-[11px] font-medium text-amber-600/90 dark:text-amber-400/90 mb-1 flex items-center gap-1 bg-amber-500/10 w-fit px-2 py-0.5 rounded-full border border-amber-500/20">
+                    <Clock className="w-3 h-3" /> Expirou em: {new Date(instance.updated_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
                 <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
                   Seu período de teste expirou e esta conexão foi desativada.
                   Assine um plano para reconectar e reativar as automações de IA.
@@ -1481,9 +1487,17 @@ export const WhatsAppInstanceCard = ({
                       <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                        Conexão expirada
-                      </p>
+                      <div className="flex justify-between items-start gap-2 mb-0.5">
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                          Conexão expirada
+                        </p>
+                        {instance.updated_at && (
+                          <span className="text-[10px] font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" />
+                            {new Date(instance.updated_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Esta instância ficou muito tempo sem conectar e expirou.
                       </p>

@@ -29,6 +29,7 @@ import { useSidebarVisibility } from "@/hooks/useSidebarVisibility";
 import { useUserWorkspaces } from "@/hooks/useUserWorkspaces";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { getWorkspaceTemplate } from "@/lib/workspaceTemplates";
+import { useTranslation } from "react-i18next";
 
 interface LayoutProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const isMobile = useIsMobile();
   const { isAppointmentsVisible, isQuotesVisible, isInvoicesVisible } = useSidebarVisibility();
@@ -106,18 +108,18 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Navigation grouped for visual structure
   const primaryNav = [
-    { name: "Dashboard", href: "/dashboard", icon: MdDashboard },
-    { name: "Workspaces", href: "/workspaces", icon: MdOutlineAppRegistration },
+    { name: t("sidebar.dashboard"), href: "/dashboard", icon: MdDashboard },
+    { name: t("sidebar.workspaces"), href: "/workspaces", icon: MdOutlineAppRegistration },
   ];
 
   const toolsNav = [
-    { name: "Conexões", href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast },
+    { name: t("sidebar.toolsConnections"), href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast },
   ];
 
-  const agentsNav = { name: "Agentes", href: "/ai-settings", icon: RiRobot2Fill };
+  const agentsNav = { name: t("sidebar.agents"), href: "/ai-settings", icon: RiRobot2Fill };
 
   const systemNav = [
-    { name: "Configurações", href: "/settings", icon: Settings },
+    { name: t("sidebar.settings"), href: "/settings", icon: Settings },
   ];
 
   const renderNavItem = (item: { name: string; href: string; icon: React.ElementType }) => {
@@ -251,7 +253,7 @@ const Layout = ({ children }: LayoutProps) => {
                   <div className="pb-2">
                     <div className="px-4 pb-1">
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Workspace Atual
+                        {t("sidebar.currentWorkspace")}
                       </span>
                     </div>
                     <WorkspaceSwitcher collapsed={false} />
@@ -288,7 +290,7 @@ const Layout = ({ children }: LayoutProps) => {
                   {templateItems.length > 0 && !sidebarCollapsed && (
                     <div className="pt-3 pb-1 px-1">
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Geral
+                        {t("sidebar.general")}
                       </span>
                     </div>
                   )}
@@ -307,10 +309,10 @@ const Layout = ({ children }: LayoutProps) => {
                   {isAppointmentsVisible && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
 
                   {/* Orçamentos */}
-                  {isQuotesVisible && renderNavItem({ name: "Orçamentos", href: "/quotes", icon: FileText })}
+                  {isQuotesVisible && renderNavItem({ name: t("sidebar.quotes"), href: "/quotes", icon: FileText })}
 
                   {/* Cobranças */}
-                  {isInvoicesVisible && renderNavItem({ name: "Cobranças", href: "/invoices", icon: Receipt })}
+                  {isInvoicesVisible && renderNavItem({ name: t("sidebar.invoices"), href: "/invoices", icon: Receipt })}
 
                   {/* Tools Navigation: Conexões WhatsApp */}
                   {toolsNav.map(renderNavItem)}
@@ -319,7 +321,7 @@ const Layout = ({ children }: LayoutProps) => {
                   {!sidebarCollapsed && (
                     <div className="pt-4 pb-1 px-1">
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Suporte e Ajustes
+                        {t("sidebar.supportAndAdjustments")}
                       </span>
                     </div>
                   )}
@@ -341,10 +343,10 @@ const Layout = ({ children }: LayoutProps) => {
                           )}
                         >
                           <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">Suporte</span>
+                          <span className="lg:hidden">{t("sidebar.support")}</span>
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">Suporte</TooltipContent>
+                      <TooltipContent side="right" className="hidden lg:block">{t("sidebar.support")}</TooltipContent>
                     </Tooltip>
                   ) : (
                     <button
@@ -358,7 +360,7 @@ const Layout = ({ children }: LayoutProps) => {
                       )}
                     >
                       <MdSupportAgent className="h-5 w-5 shrink-0" />
-                      <span>Suporte</span>
+                      <span>{t("sidebar.support")}</span>
                     </button>
                   )}
 
@@ -377,10 +379,10 @@ const Layout = ({ children }: LayoutProps) => {
                           )}
                         >
                           <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">Indicações</span>
+                          <span className="lg:hidden">{t("sidebar.referrals")}</span>
                         </Link>
                       </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">Indicações</TooltipContent>
+                      <TooltipContent side="right" className="hidden lg:block">{t("sidebar.referrals")}</TooltipContent>
                     </Tooltip>
                   ) : (
                     <Link
@@ -393,7 +395,7 @@ const Layout = ({ children }: LayoutProps) => {
                       )}
                     >
                       <HiOutlineGift className="h-5 w-5 shrink-0" />
-                      <span>Indicações</span>
+                      <span>{t("sidebar.referrals")}</span>
                     </Link>
                   )}
 
@@ -428,7 +430,7 @@ const Layout = ({ children }: LayoutProps) => {
                             <LogOut className="h-6 w-6 transition-transform duration-200 group-hover:scale-110" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right">Sair</TooltipContent>
+                        <TooltipContent side="right">{t("sidebar.logout")}</TooltipContent>
                       </Tooltip>
                     ) : null}
                     <Button
@@ -437,7 +439,7 @@ const Layout = ({ children }: LayoutProps) => {
                       onClick={handleLogout}
                     >
                       <LogOut className="h-5 w-5" />
-                      Sair
+                      {t("sidebar.logout")}
                     </Button>
                   </div>
                 </div>

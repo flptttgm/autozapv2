@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   addDays,
   format,
+  getDay,
   getHours,
   getMinutes,
   isSameDay,
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { WeeklyAppointmentCard, AppointmentData } from "./WeeklyAppointmentCard";
 import { MobileAppointmentCard } from "./MobileAppointmentCard";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAgendaConfig } from "@/components/settings/AgendaSettings";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
@@ -37,18 +39,7 @@ interface WeeklyViewProps {
   onAppointmentClick?: (appointment: AppointmentData) => void;
 }
 
-const START_HOUR = 7;
-const END_HOUR = 21;
-const SLOT_HEIGHT_PX = 30;
 const SLOTS_PER_HOUR = 2;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const TOTAL_SLOTS = TOTAL_HOURS * SLOTS_PER_HOUR;
-
-const TIME_SLOTS = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
-  const hour = START_HOUR + Math.floor(i / 2);
-  const minutes = (i % 2) * 30;
-  return { hour, minutes, label: `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}` };
-});
 
 export const WeeklyView = ({
   selectedDate,
@@ -59,9 +50,27 @@ export const WeeklyView = ({
 }: WeeklyViewProps) => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const isMobile = useIsMobile();
+  const { data: agendaConfig } = useAgendaConfig();
+
+  const START_HOUR = agendaConfig?.start_hour ?? 7;
+  const END_HOUR = agendaConfig?.end_hour ?? 21;
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const TOTAL_SLOTS = TOTAL_HOURS * SLOTS_PER_HOUR;
+
+  const TIME_SLOTS = useMemo(() => Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+    const hour = START_HOUR + Math.floor(i / 2);
+    const minutes = (i % 2) * 30;
+    return { hour, minutes, label: `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}` };
+  }), [START_HOUR, TOTAL_SLOTS]);
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const allWeekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekDays = allWeekDays.filter((day) => {
+    const dow = getDay(day); // 0=Sun, 6=Sat
+    if (dow === 0 && !agendaConfig?.show_sunday) return false;
+    if (dow === 6 && !agendaConfig?.show_saturday) return false;
+    return true;
+  });
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60_000);
@@ -84,22 +93,34 @@ export const WeeklyView = ({
     const startHour = getHours(start) + getMinutes(start) / 60;
     const endHour = getHours(end) + getMinutes(end) / 60;
 
-    const topPx = (startHour - START_HOUR) * SLOTS_PER_HOUR * SLOT_HEIGHT_PX;
-    const heightPx = (endHour - startHour) * SLOTS_PER_HOUR * SLOT_HEIGHT_PX;
+    // The time labels use items-end + translate-y-1/2, so "07:00" visually
+    // sits at the bottom edge of slot 0. That means the visual "07:00" line
+    // is 1 slot down from the physical top of the grid.
+    // We add 1 slot offset so the appointment card aligns with the label.
+    const startSlot = (startHour - START_HOUR) * SLOTS_PER_HOUR + 1;
+    const durationSlots = (endHour - startHour) * SLOTS_PER_HOUR;
+
+    const topPercent = (startSlot / TOTAL_SLOTS) * 100;
+    const heightPercent = (durationSlots / TOTAL_SLOTS) * 100;
+
+    // Minimum height = 1 slot (30 min visual)
+    const minHeightPercent = (1 / TOTAL_SLOTS) * 100;
 
     return {
-      top: `${Math.max(0, topPx)}px`,
-      height: `${Math.max(30, heightPx)}px`,
+      top: `${Math.max(0, topPercent)}%`,
+      height: `${Math.max(minHeightPercent, heightPercent)}%`,
     };
   };
 
-  const getCurrentTimePositionPx = () => {
+  const getCurrentTimePositionPercent = () => {
     const hours = getHours(currentTime) + getMinutes(currentTime) / 60;
     if (hours < START_HOUR || hours >= END_HOUR) return null;
-    return (hours - START_HOUR) * SLOTS_PER_HOUR * SLOT_HEIGHT_PX;
+    // Same 1-slot offset as appointments to align with the time label grid
+    const slot = (hours - START_HOUR) * SLOTS_PER_HOUR + 1;
+    return (slot / TOTAL_SLOTS) * 100;
   };
 
-  const currentTimePositionPx = getCurrentTimePositionPx();
+  const currentTimePositionPercent = getCurrentTimePositionPercent();
   const isTodayInView = weekDays.some((day) => isToday(day));
 
   const goToPreviousDay = () => {
@@ -166,18 +187,19 @@ export const WeeklyView = ({
   }
 
   // Desktop: Grade semanal
-  const gridCols = "grid-cols-[60px_repeat(7,1fr)]";
+  const numDays = weekDays.length;
+  const gridStyle = { gridTemplateColumns: `60px repeat(${numDays}, 1fr)` };
 
   return (
     <div className="flex-1 overflow-hidden bg-card flex flex-col">
       <div
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto flex flex-col"
         style={{ scrollbarGutter: "stable" }}
       >
         {/* Desktop: Sticky Header com 7 dias */}
-        <div className="sticky top-0 z-40 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/20 border-b border-border">
-          <div className={cn("grid", gridCols)}>
-            <div className="border-r border-border" />
+        <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
+          <div className="grid" style={gridStyle}>
+            <div className="border-b border-border/30" />
             {weekDays.map((day) => {
               const dayIsToday = isToday(day);
               const dayIsSelected = isSameDay(day, selectedDate);
@@ -187,24 +209,27 @@ export const WeeklyView = ({
                   key={day.toISOString()}
                   onClick={() => onSelectDate(day)}
                   className={cn(
-                    "flex flex-col items-center py-3 transition-all border-r border-border last:border-r-0",
-                    "hover:bg-primary/5",
-                    dayIsSelected && "bg-primary/10"
+                    "flex flex-col items-center justify-center py-4 transition-all duration-300 border-b border-border/30 relative group",
+                    dayIsSelected ? "bg-primary/[0.02]" : "hover:bg-muted/30"
                   )}
                 >
+                  {dayIsToday && (
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary rounded-b-md" />
+                  )}
                   <span
                     className={cn(
-                      "text-xs uppercase tracking-wider font-medium",
-                      dayIsToday ? "text-primary" : "text-muted-foreground"
+                      "text-[10px] sm:text-[11px] uppercase tracking-widest font-semibold mb-1.5 transition-colors",
+                      dayIsToday ? "text-primary" : "text-muted-foreground group-hover:text-foreground/80"
                     )}
                   >
                     {format(day, "EEE", { locale: ptBR })}
                   </span>
                   <span
                     className={cn(
-                      "text-2xl font-semibold mt-0.5 w-10 h-10 flex items-center justify-center rounded-full transition-colors",
-                      dayIsToday && "bg-primary text-primary-foreground",
-                      !dayIsToday && dayIsSelected && "bg-muted"
+                      "text-lg sm:text-xl font-medium w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full transition-all duration-300",
+                      dayIsToday ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-105" :
+                        dayIsSelected ? "bg-foreground text-background scale-105" :
+                          "text-foreground group-hover:bg-muted font-normal"
                     )}
                   >
                     {format(day, "d")}
@@ -217,35 +242,37 @@ export const WeeklyView = ({
 
         {/* Grid */}
         <div
-          className={cn("grid relative", gridCols)}
-          style={{ height: `${TOTAL_SLOTS * SLOT_HEIGHT_PX}px` }}
+          className="grid relative flex-1 min-h-[450px]"
+          style={gridStyle}
         >
           {/* Current Time Indicator */}
-          {isTodayInView && currentTimePositionPx !== null && (
+          {isTodayInView && currentTimePositionPercent !== null && (
             <div
-              className="absolute left-0 right-0 z-30 pointer-events-none"
-              style={{ top: `${currentTimePositionPx}px` }}
+              className="absolute left-[60px] right-0 z-30 pointer-events-none"
+              style={{ top: `${currentTimePositionPercent}%` }}
             >
-              <div className="relative flex items-center pl-[52px]">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-lg shadow-red-500/40" />
-                <div className="flex-1 h-[2px] bg-red-500 shadow-sm shadow-red-500/30" />
+              <div className="relative flex items-center">
+                <div className="absolute -left-[5px] flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm shadow-red-500/50" />
+                  <div className="absolute w-2.5 h-2.5 rounded-full bg-red-500/50 animate-ping opacity-75" />
+                </div>
+                <div className="flex-1 h-[2px] bg-red-500/70 shadow-[0_0_8px_rgba(239,68,68,0.3)]" />
               </div>
             </div>
           )}
 
           {/* Time Labels Column */}
-          <div className="border-r border-border bg-muted/20">
+          <div className="flex flex-col bg-card relative z-20 pb-1">
             {TIME_SLOTS.map((slot) => (
               <div
                 key={slot.label}
-                className={cn(
-                  "h-[30px] border-b flex items-start justify-end pr-2 pt-0.5",
-                  slot.minutes === 0 ? "border-border/50" : "border-border/20"
-                )}
+                className="flex-1 min-h-0 relative flex items-end justify-end pr-3"
               >
                 <span className={cn(
-                  "text-[10px] font-medium",
-                  slot.minutes === 0 ? "text-muted-foreground" : "text-muted-foreground/50"
+                  "font-medium leading-none translate-y-1/2 bg-card px-1",
+                  slot.minutes === 0
+                    ? "text-[11px] text-muted-foreground"
+                    : "text-[10px] text-muted-foreground/30"
                 )}>
                   {slot.label}
                 </span>
@@ -254,7 +281,7 @@ export const WeeklyView = ({
           </div>
 
           {/* Day Columns */}
-          {weekDays.map((day) => {
+          {weekDays.map((day, dayIndex) => {
             const dayAppts = getAppointmentsForDay(day);
             const dayIsSelected = isSameDay(day, selectedDate);
             const dayIsToday = isToday(day);
@@ -263,9 +290,12 @@ export const WeeklyView = ({
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "relative border-r border-border last:border-r-0",
-                  dayIsSelected && "bg-primary/5",
-                  dayIsToday && !dayIsSelected && "bg-accent/30"
+                  "relative border-l border-border/30 transition-colors duration-300 flex flex-col group/col",
+                  dayIsSelected
+                    ? "bg-primary/[0.03]"
+                    : dayIsToday
+                      ? "bg-primary/[0.015]"
+                      : dayIndex % 2 === 1 && "bg-muted/80"
                 )}
               >
                 {/* Time Slot Lines */}
@@ -273,8 +303,8 @@ export const WeeklyView = ({
                   <div
                     key={slot.label}
                     className={cn(
-                      "h-[30px] border-b",
-                      slot.minutes === 0 ? "border-border/50" : "border-border/20"
+                      "flex-1 min-h-0 border-b",
+                      slot.minutes === 0 ? "border-border/40" : "border-border/20 border-dashed"
                     )}
                   />
                 ))}

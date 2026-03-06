@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Folder, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 const FOLDER_COLORS = [
   "#6366f1", // Indigo (default)
@@ -44,11 +45,12 @@ export function CreateFolderDialog({
   const [color, setColor] = useState(FOLDER_COLORS[0]);
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const { t } = useTranslation("leads");
 
   const createFolderMutation = useMutation({
     mutationFn: async () => {
-      if (!profile?.workspace_id) throw new Error("Workspace não encontrado");
-      if (!name.trim()) throw new Error("Nome da pasta é obrigatório");
+      if (!profile?.workspace_id) throw new Error(t("workspaceNotFound"));
+      if (!name.trim()) throw new Error(t("folderNameRequired"));
 
       const { data, error } = await supabase
         .from("lead_folders")
@@ -62,7 +64,7 @@ export function CreateFolderDialog({
 
       if (error) {
         if (error.code === "23505") {
-          throw new Error("Já existe uma pasta com esse nome");
+          throw new Error(t("folderNameExists"));
         }
         throw error;
       }
@@ -71,12 +73,12 @@ export function CreateFolderDialog({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["lead-folders"] });
-      toast.success(`Pasta "${name}" criada com sucesso!`);
+      toast.success(t("folderCreateSuccess", { name }));
       onFolderCreated?.(data.id);
       handleClose();
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Erro ao criar pasta");
+      toast.error(error.message || t("folderCreateError"));
     },
   });
 
@@ -97,36 +99,35 @@ export function CreateFolderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Folder className="h-5 w-5" style={{ color }} />
-            Criar Nova Pasta
+            {t("createNewFolder")}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="folder-name">Nome da pasta</Label>
+            <Label htmlFor="folder-name">{t("folderName")}</Label>
             <Input
               id="folder-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Black Friday 40k"
+              placeholder={t("folderNamePlaceholder")}
               autoFocus
               maxLength={50}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Cor da pasta</Label>
+            <Label>{t("folderColor")}</Label>
             <div className="flex flex-wrap gap-2">
               {FOLDER_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={`w-8 h-8 rounded-full transition-all ${
-                    color === c
+                  className={`w-8 h-8 rounded-full transition-all ${color === c
                       ? "ring-2 ring-offset-2 ring-offset-background ring-primary scale-110"
                       : "hover:scale-105"
-                  }`}
+                    }`}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -136,7 +137,7 @@ export function CreateFolderDialog({
           <DialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-4">
             <DialogClose asChild>
               <Button type="button" variant="outline" className="w-full sm:w-auto">
-                Cancelar
+                {t("cancel")}
               </Button>
             </DialogClose>
             <Button
@@ -147,10 +148,10 @@ export function CreateFolderDialog({
               {createFolderMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Criando...
+                  {t("creating")}
                 </>
               ) : (
-                "Criar Pasta"
+                t("createFolderBtn")
               )}
             </Button>
           </DialogFooter>

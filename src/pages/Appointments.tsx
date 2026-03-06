@@ -12,8 +12,11 @@ import {
   Download,
   Calendar,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Filter,
   History,
+  Sun,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,15 +24,20 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  addWeeks,
+  subWeeks,
   format,
 } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { AppointmentCalendar } from "@/components/appointments/AppointmentCalendar";
 import { WeeklyView } from "@/components/appointments/WeeklyView";
+import { DailyView } from "@/components/appointments/DailyView";
 import { MonthlyView } from "@/components/appointments/MonthlyView";
 import { WeekRangeSelector } from "@/components/appointments/WeekRangeSelector";
 import { CreateAppointmentDialog } from "@/components/appointments/CreateAppointmentDialog";
 import { AppointmentDetailsModal } from "@/components/appointments/AppointmentDetailsModal";
 import { AppointmentHistoryTable } from "@/components/appointments/AppointmentHistoryTable";
+import { DayPreparationPanel } from "@/components/appointments/DayPreparationPanel";
 import { downloadICS } from "@/lib/ics-utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -37,7 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AppointmentData } from "@/components/appointments/WeeklyAppointmentCard";
 
-type ViewMode = "week" | "month" | "history";
+type ViewMode = "day" | "week" | "month" | "history";
 type AppointmentStatus =
   | "pending_owner"
   | "pending_lead"
@@ -103,7 +111,7 @@ const Appointments = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem("appointments-view-mode");
-    return saved === "week" || saved === "month" || saved === "history"
+    return saved === "day" || saved === "week" || saved === "month" || saved === "history"
       ? saved
       : "month";
   });
@@ -128,7 +136,7 @@ const Appointments = () => {
       let query = supabase
         .from("appointments")
         .select(
-          "id, title, description, start_time, end_time, status, source, metadata, leads(name, phone, whatsapp_instance_id)",
+          "id, title, description, start_time, end_time, status, metadata, leads(name, phone, whatsapp_instance_id, avatar_url, email, status, score)",
         )
         .eq("workspace_id", profile.workspace_id)
         .gte("start_time", weekStart.toISOString())
@@ -180,7 +188,7 @@ const Appointments = () => {
       const { data, error } = await supabase
         .from("appointments")
         .select(
-          "id, title, description, start_time, end_time, status, source, metadata, leads(name, phone, whatsapp_instance_id)",
+          "id, title, description, start_time, end_time, status, metadata, leads(name, phone, whatsapp_instance_id, avatar_url, email, status, score)",
         )
         .eq("workspace_id", profile.workspace_id)
         .gte("start_time", calendarStart.toISOString())
@@ -341,15 +349,36 @@ const Appointments = () => {
     setCalendarMonth(date);
   };
 
-  const handleExportWeek = () => {
-    if (!weekAppointments || weekAppointments.length === 0) {
-      toast.error("Nenhum agendamento na semana para exportar");
-      return;
-    }
-    const weekStr = format(selectedDate, "yyyy-'W'ww");
-    downloadICS(weekAppointments, `agendamentos-semana-${weekStr}`);
-    toast.success("Arquivo .ics baixado!");
-  };
+  useEffect(() => {
+    const handleCreate = () => setCreateDialogOpen(true);
+    const handleExport = () => {
+      if (viewMode === "month") {
+        if (!filteredMonthAppointments || filteredMonthAppointments.length === 0) {
+          toast.error("Nenhum agendamento no mês para exportar");
+          return;
+        }
+        const monthStr = format(selectedDate, "yyyy-MM");
+        downloadICS(filteredMonthAppointments, `agendamentos-mes-${monthStr}`);
+        toast.success("Arquivo .ics baixado!");
+      } else {
+        if (!filteredWeekAppointments || filteredWeekAppointments.length === 0) {
+          toast.error("Nenhum agendamento para exportar");
+          return;
+        }
+        const weekStr = format(selectedDate, "yyyy-'W'ww");
+        downloadICS(filteredWeekAppointments, `agendamentos-${weekStr}`);
+        toast.success("Arquivo .ics baixado!");
+      }
+    };
+
+    window.addEventListener("open-create-appointment", handleCreate);
+    window.addEventListener("export-appointments", handleExport);
+
+    return () => {
+      window.removeEventListener("open-create-appointment", handleCreate);
+      window.removeEventListener("export-appointments", handleExport);
+    };
+  }, [viewMode, filteredWeekAppointments, filteredMonthAppointments, selectedDate]);
 
   const handleAppointmentClick = (appointment: AppointmentData) => {
     setSelectedAppointment(appointment);
@@ -420,22 +449,22 @@ const Appointments = () => {
                       localStorage.setItem("appointments-view-mode", value);
                     }
                   }}
-                  className="bg-muted/50 p-0.5 sm:p-1 rounded-lg"
+                  className="bg-muted/40 backdrop-blur-sm p-0.5 sm:p-1 rounded-xl border border-border/30 shadow-sm"
                 >
                   <ToggleGroupItem
-                    value="month"
-                    aria-label="Visualização mensal"
-                    className="px-3 sm:px-3 text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                    value="day"
+                    aria-label="Visualização diária"
+                    className="px-3 sm:px-3 rounded-lg text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-md transition-all duration-200"
                   >
-                    <CalendarDays className="h-4 w-4 sm:mr-1.5" />
+                    <Sun className="h-4 w-4 sm:mr-1.5" />
                     <span className="text-sm sm:text-sm hidden sm:inline">
-                      Mês
+                      Dia
                     </span>
                   </ToggleGroupItem>
                   <ToggleGroupItem
                     value="week"
                     aria-label="Visualização semanal"
-                    className="px-3 sm:px-3 text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                    className="px-3 sm:px-3 rounded-lg text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-md transition-all duration-200"
                   >
                     <Calendar className="h-4 w-4 sm:mr-1.5" />
                     <span className="text-sm sm:text-sm hidden sm:inline">
@@ -443,9 +472,19 @@ const Appointments = () => {
                     </span>
                   </ToggleGroupItem>
                   <ToggleGroupItem
+                    value="month"
+                    aria-label="Visualização mensal"
+                    className="px-3 sm:px-3 rounded-lg text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-md transition-all duration-200"
+                  >
+                    <CalendarDays className="h-4 w-4 sm:mr-1.5" />
+                    <span className="text-sm sm:text-sm hidden sm:inline">
+                      Mês
+                    </span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
                     value="history"
                     aria-label="Histórico de agendamentos"
-                    className="px-3 sm:px-3 text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                    className="px-3 sm:px-3 rounded-lg text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-md transition-all duration-200"
                   >
                     <History className="h-4 w-4 sm:mr-1.5" />
                     <span className="text-sm sm:text-sm hidden sm:inline">
@@ -453,75 +492,66 @@ const Appointments = () => {
                     </span>
                   </ToggleGroupItem>
                 </ToggleGroup>
-              </div>
-              {/* Botões de ação - escondidos no mobile */}
-              <div className="hidden sm:flex gap-2">
-                <Button variant="outline" onClick={handleExportWeek}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar {viewMode === "week" ? "semana" : "mês"}
-                </Button>
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Agendamento
-                </Button>
+                {/* Removed Botões de ação -> Moved to global header */}
               </div>
             </div>
-            {/* Linha 2: Filtros de status - escondidos no mobile */}
-            <div className="hidden sm:flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mr-1">
-                <Filter className="h-4 w-4" />
-                <span>Filtros:</span>
-              </div>
-              {(
-                Object.entries(STATUS_CONFIG) as [
-                  AppointmentStatus,
-                  (typeof STATUS_CONFIG)[AppointmentStatus],
-                ][]
-              ).map(([status, config]) => (
-                <button
-                  key={status}
-                  onClick={() => toggleFilter(status)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all",
-                    "border hover:scale-105",
-                    activeFilters.includes(status)
-                      ? cn(config.activeColor, "border-transparent shadow-sm")
-                      : "bg-background border-border text-muted-foreground hover:border-primary/50",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      activeFilters.includes(status)
-                        ? "bg-white/80"
-                        : config.color,
-                    )}
-                  />
-                  {config.label}
-                </button>
-              ))}
-              {activeFilters.length > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ml-1"
-                >
-                  Limpar
-                </button>
-              )}
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-auto text-xs">
-                  {filteredWeekAppointments.length} agendamento(s)
-                </Badge>
-              )}
-            </div>
+            {/* Linha 2: < > Hoje + Filtros */}
+            {viewMode !== "history" && viewMode !== "day" && (
+              <div className="hidden sm:flex items-center gap-3">
+                {/* Week navigation - only in week mode */}
+                {viewMode === "week" && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleWeekChange(subWeeks(selectedDate, 1))}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => handleWeekChange(addWeeks(selectedDate, 1))}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleWeekChange(new Date())} className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3">
+                      Hoje
+                    </Button>
+                  </div>
+                )}
 
-            {/* Linha 3: Seletor de semana - only show in week mode on desktop */}
-            {viewMode === "week" && (
-              <div className="hidden sm:block">
-                <WeekRangeSelector
-                  selectedDate={selectedDate}
-                  onWeekChange={handleWeekChange}
-                />
+                {/* Filtros de status */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(
+                    Object.entries(STATUS_CONFIG) as [
+                      AppointmentStatus,
+                      (typeof STATUS_CONFIG)[AppointmentStatus],
+                    ][]
+                  ).map(([status, config]) => (
+                    <button
+                      key={status}
+                      onClick={() => toggleFilter(status)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200",
+                        "border hover:scale-105 active:scale-95",
+                        activeFilters.includes(status)
+                          ? cn(config.activeColor, "border-transparent shadow-md ring-2 ring-current/20")
+                          : "bg-background/80 backdrop-blur-sm border-border/50 text-muted-foreground hover:border-primary/50 hover:shadow-sm",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "w-2 h-2 rounded-full",
+                          activeFilters.includes(status)
+                            ? "bg-white/80"
+                            : config.color,
+                        )}
+                      />
+                      {config.label}
+                    </button>
+                  ))}
+                  {activeFilters.length > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ml-1"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -536,9 +566,16 @@ const Appointments = () => {
             ) : (
               <>
                 {/* Calendar View */}
-                <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0 gap-4">
+                <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0 min-w-0 gap-4">
                   <Card className="flex-1 overflow-hidden flex flex-col glass border-border/40 shadow-sm">
-                    {viewMode === "week" ? (
+                    {viewMode === "day" ? (
+                      <DailyView
+                        selectedDate={selectedDate}
+                        appointments={filteredWeekAppointments}
+                        onSelectDate={setSelectedDate}
+                        onAppointmentClick={handleAppointmentClick}
+                      />
+                    ) : viewMode === "week" ? (
                       <WeeklyView
                         selectedDate={selectedDate}
                         appointments={filteredWeekAppointments}
@@ -565,7 +602,7 @@ const Appointments = () => {
                       <Button
                         variant="outline"
                         className="flex-1"
-                        onClick={handleExportWeek}
+                        onClick={() => window.dispatchEvent(new CustomEvent("export-appointments"))}
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Exportar
@@ -625,9 +662,25 @@ const Appointments = () => {
                   </div>
                 </div>
 
-                {/* Desktop: Sidebar normal - only show in week mode */}
+                {/* Desktop: Sidebar - DayPreparationPanel for day mode, Calendar for week mode */}
+                {viewMode === "day" && (
+                  <DayPreparationPanel
+                    selectedDate={selectedDate}
+                    appointments={weekAppointments || []}
+                  />
+                )}
                 {viewMode === "week" && (
-                  <div className="hidden lg:flex lg:w-72 flex-shrink-0 flex-col space-y-4">
+                  <div className="hidden lg:flex lg:w-72 flex-shrink-0 flex-col space-y-3">
+                    {/* Date range aligned above calendar */}
+                    <div className="flex items-center justify-center gap-2 text-sm px-2">
+                      <span className="font-semibold text-primary">
+                        {format(startOfWeek(selectedDate, { weekStartsOn: 1 }), "d 'de' MMM, yyyy", { locale: ptBR })}
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-semibold text-primary">
+                        {format(endOfWeek(selectedDate, { weekStartsOn: 1 }), "d 'de' MMM, yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
                     <Card className="p-0 overflow-hidden shadow-sm glass border-border/40">
                       <AppointmentCalendar
                         selectedDate={selectedDate}

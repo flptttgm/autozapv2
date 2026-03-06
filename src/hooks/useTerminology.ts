@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 export type TerminologyType = "clientes" | "leads" | "pacientes" | "contatos";
 interface Terminology {
@@ -14,49 +15,50 @@ interface Terminology {
   captura: string;
 }
 
-const TERMINOLOGY_MAP: Record<TerminologyType, Terminology> = {
-  contatos: {
-    singular: "Contato",
-    plural: "Contatos",
-    singularLower: "contato",
-    pluralLower: "contatos",
-    novo: "Novo Contato",
-    nova: "Nova Contato",
-    captura: "captura automática de contatos",
-  },
-  clientes: {
-    singular: "Cliente",
-    plural: "Clientes",
-    singularLower: "cliente",
-    pluralLower: "clientes",
-    novo: "Novo Cliente",
-    nova: "Nova Cliente",
-    captura: "captura automática de clientes",
-  },
-  leads: {
-    singular: "Lead",
-    plural: "Leads",
-    singularLower: "lead",
-    pluralLower: "leads",
-    novo: "Novo Lead",
-    nova: "Nova Lead",
-    captura: "captura automática de leads",
-  },
-  pacientes: {
-    singular: "Paciente",
-    plural: "Pacientes",
-    singularLower: "paciente",
-    pluralLower: "pacientes",
-    novo: "Novo Paciente",
-    nova: "Nova Paciente",
-    captura: "captura automática de pacientes",
-  },
-};
-
-const DEFAULT_TERMINOLOGY = TERMINOLOGY_MAP.contatos;
+function buildTerminologyMap(t: (key: string) => string): Record<TerminologyType, Terminology> {
+  return {
+    contatos: {
+      singular: t("contact"),
+      plural: t("contacts"),
+      singularLower: t("contactLower"),
+      pluralLower: t("contactsLower"),
+      novo: t("newContactM"),
+      nova: t("newContactF"),
+      captura: t("autoCapture_contatos"),
+    },
+    clientes: {
+      singular: t("client"),
+      plural: t("clients"),
+      singularLower: t("clientLower"),
+      pluralLower: t("clientsLower"),
+      novo: t("newClientM"),
+      nova: t("newClientF"),
+      captura: t("autoCapture_clientes"),
+    },
+    leads: {
+      singular: t("lead"),
+      plural: t("leads"),
+      singularLower: t("leadLower"),
+      pluralLower: t("leadsLower"),
+      novo: t("newLeadM"),
+      nova: t("newLeadF"),
+      captura: t("autoCapture_leads"),
+    },
+    pacientes: {
+      singular: t("patient"),
+      plural: t("patients"),
+      singularLower: t("patientLower"),
+      pluralLower: t("patientsLower"),
+      novo: t("newPatientM"),
+      nova: t("newPatientF"),
+      captura: t("autoCapture_pacientes"),
+    },
+  };
+}
 
 export const useTerminology = () => {
   const { user } = useAuth();
+  const { t, i18n } = useTranslation("terminology");
 
   // Get the owner's primary workspace ID (first created workspace owned by this user)
   // Terminology is shared across all workspaces of the same owner
@@ -115,7 +117,9 @@ export const useTerminology = () => {
   });
 
   const type: TerminologyType = config?.type || "contatos";
-  const terminology = TERMINOLOGY_MAP[type] || DEFAULT_TERMINOLOGY;
+  const terminologyMap = buildTerminologyMap(t);
+  const defaultTerminology = terminologyMap.contatos;
+  const terminology = terminologyMap[type] || defaultTerminology;
 
   const isLoading = isLoadingWorkspace || isLoadingConfig || !user?.id;
 
@@ -125,7 +129,8 @@ export const useTerminology = () => {
     terminology,
     isLoading,
     ownerWorkspaceId,
-  }), [type, terminology, isLoading, user?.id, ownerWorkspaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [type, terminology, isLoading, user?.id, ownerWorkspaceId, i18n.language]);
 
   return stableTerminology;
 };
