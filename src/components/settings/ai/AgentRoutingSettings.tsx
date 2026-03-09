@@ -17,6 +17,7 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Route, Zap, Brain, MessageSquare, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { TRANSITION_STYLES, ROUTING_MODES } from "@/lib/agent-profiles";
+import { useTranslation } from "react-i18next";
 
 interface AgentRoutingSettingsProps {
   workspaceId: string;
@@ -41,6 +42,7 @@ interface AgentOption {
 
 export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation("agents");
 
   // Fetch routing config
   const { data: routingConfig, isLoading: configLoading } = useQuery({
@@ -163,13 +165,13 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Route className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold text-lg">Roteamento Inteligente</h3>
+            <h3 className="font-semibold text-lg">{t("routingSettings.title")}</h3>
             {config.is_routing_enabled && (
-              <Badge variant="default" className="text-xs">Ativo</Badge>
+              <Badge variant="default" className="text-xs">{t("routingSettings.active")}</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Quando ativado, a IA identifica a intenção do cliente e direciona automaticamente para o agente ideal.
+            {t("routingSettings.description")}
           </p>
         </div>
         <Switch
@@ -183,7 +185,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
           <div className="border-t pt-6 space-y-6">
             {/* Routing Mode */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Modo de Detecção</Label>
+              <Label className="text-base font-medium">{t("routingSettings.detectionMode")}</Label>
               <RadioGroup
                 value={config.routing_mode}
                 onValueChange={(value) => handleConfigChange({ routing_mode: value as 'hybrid' | 'keywords' | 'ai' })}
@@ -276,7 +278,7 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
 
             {/* Transition Style */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Estilo de Transição</Label>
+              <Label className="text-base font-medium">{t("routingSettings.transitionStyle")}</Label>
               <RadioGroup
                 value={config.transition_style}
                 onValueChange={(value) => handleConfigChange({ transition_style: value as 'friendly' | 'formal' | 'silent' })}
@@ -304,9 +306,9 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
 
             {/* Default Agent */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Agente Padrão</Label>
+              <Label className="text-base font-medium">{t("routingSettings.defaultAgent")}</Label>
               <p className="text-sm text-muted-foreground">
-                Usado quando nenhum agente específico se aplica à conversa
+                {t("routingSettings.defaultAgentDesc")}
               </p>
               <Select
                 value={config.default_agent_id || 'none'}
@@ -346,11 +348,9 @@ export const AgentRoutingSettings = ({ workspaceId }: AgentRoutingSettingsProps)
             <div className="flex gap-3">
               <MessageSquare className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">Como funciona</p>
+                <p className="text-sm font-medium">{t("routingSettings.howItWorks")}</p>
                 <p className="text-xs text-muted-foreground">
-                  A cada mensagem do cliente, o sistema analisa o conteúdo e decide qual agente
-                  é mais adequado. Se mudar de agente, uma mensagem de transição é enviada
-                  apresentando o novo atendente. O histórico da conversa é mantido entre as trocas.
+                  {t("routingSettings.howItWorksDesc")}
                 </p>
               </div>
             </div>

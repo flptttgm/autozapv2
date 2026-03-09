@@ -324,7 +324,6 @@ const LeadTableRow = ({
               <div className="flex flex-col gap-1.5 min-w-[70px]">
                 <div className="flex items-center justify-between">
                   <span className={cn("text-xs font-bold", config.color)}>{lead.score}</span>
-                  <span className="text-[10px]">{config.emoji}</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
                   <div

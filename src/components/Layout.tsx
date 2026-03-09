@@ -165,7 +165,8 @@ const Layout = ({ children }: LayoutProps) => {
     <TooltipProvider delayDuration={0}>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
         <TrialBanner key={activeWorkspace?.id} />
-        <div className="flex-1 flex overflow-hidden relative">
+
+        <div className="flex-1 flex overflow-hidden relative min-w-0">
           {/* Mobile Overlay */}
           {sidebarOpen && (
             <div
@@ -178,20 +179,20 @@ const Layout = ({ children }: LayoutProps) => {
           {/* Sidebar */}
           <aside
             className={cn(
-              "shrink-0 border-r border-border transition-all duration-300 will-change-transform z-[55]",
+              "border-r border-border transition-all duration-300 will-change-transform z-[55]",
               "bg-card/95 supports-[backdrop-filter]:bg-card/60 backdrop-blur-xl dark:bg-card/20 dark:border-white/5",
               "flex flex-col overflow-x-hidden",
               sidebarCollapsed ? "lg:overflow-y-auto lg:scrollbar-hide" : "overflow-y-auto",
-              // Mobile/Tablet: fixed overlay; Desktop: relative
-              "fixed lg:relative lg:translate-x-0 lg:top-0",
+              // Mobile/Tablet: fixed overlay; Desktop: relative in flex flow
+              "fixed lg:relative lg:translate-x-0 lg:top-0 lg:shrink-0",
               sidebarOpen ? "translate-x-0" : "-translate-x-full",
-              // Mobile/Tablet: leave space for bottom nav and add rounded corner
+              // Mobile/Tablet: rounded corner and shadow; desktop: none
               "rounded-br-2xl shadow-xl lg:rounded-none lg:shadow-none",
-              // Height: fixed on mobile/tablet (max-h restricted), full height on desktop flex
+              // Height: screen on mobile, full flex on desktop
               "h-screen lg:h-full",
-              // Desktop: collapsible width
-              sidebarCollapsed ? "lg:w-[82px]" : "lg:w-64",
+              // Width: visual width for the sidebar panel itself
               "w-64",
+              sidebarCollapsed ? "lg:w-[82px]" : "lg:w-64",
               "sidebar-pattern-bg"
             )}
             style={{
@@ -201,7 +202,7 @@ const Layout = ({ children }: LayoutProps) => {
                 ? 'calc(100vh - var(--top-banner-height, 0px) - var(--mobile-bottom-nav-height, 80px))'
                 : !isMobile && typeof window !== 'undefined' && window.innerWidth < 1024 // Tablet case (fixed but not isMobile)
                   ? 'calc(100vh - var(--top-banner-height, 0px))'
-                  : '100%' // Desktop relative
+                  : '100%', // Desktop relative
             }}
           >
             <div className="flex flex-col h-full min-h-0 relative z-10">
@@ -262,7 +263,7 @@ const Layout = ({ children }: LayoutProps) => {
 
                 <nav className={cn(
                   "space-y-1 flex-1 min-h-0 overflow-y-auto",
-                  sidebarCollapsed ? "lg:px-3" : "px-3",
+                  sidebarCollapsed ? "lg:px-3 lg:scrollbar-hide" : "px-3",
                   "px-3"
                 )}>
                   {/* Primary Navigation: Dashboard + Workspaces (only on principal workspace) */}
@@ -448,9 +449,9 @@ const Layout = ({ children }: LayoutProps) => {
           </aside>
 
           {/* Main Content + AI Sidebar flex layout */}
-          <div className="flex-1 flex min-h-0 min-w-0">
+          <div className="flex-1 flex min-h-0 min-w-0 w-full max-w-full overflow-hidden">
             <main
-              className="flex-1 flex flex-col transition-all duration-300 min-h-0 min-w-0"
+              className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-full"
             >
               {/* Header - hidden on mobile */}
               {!isMobile && (

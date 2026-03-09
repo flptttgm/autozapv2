@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   X, Send, Sparkles, Bot, User, Trash2, ArrowRight, Maximize2, Minimize2,
   Plus, ChevronDown, Mic, Square, Loader2, Paperclip, ImageIcon,
-  MessageSquare, Clock, History
+  MessageSquare, Clock, History, Globe, Wand2, Copy, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,10 +69,10 @@ interface AIChatSidebarProps {
 
 // ─── Constants ─────────────────────────────────────
 const MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", icon: "⚡", provider: "Google" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", icon: "✨", provider: "Google" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini", icon: "🟢", provider: "OpenAI" },
-  { id: "gpt-4o", label: "GPT-4o", icon: "🔵", provider: "OpenAI" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
+  { id: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
 ];
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -152,12 +152,14 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 async function streamChat({
   messages,
   model,
+  type,
   onDelta,
   onDone,
   onError,
 }: {
   messages: { role: string; content: string }[];
   model: string;
+  type: string;
   onDelta: (deltaText: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -174,7 +176,7 @@ async function streamChat({
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ messages, model }),
+      body: JSON.stringify({ messages, model, type }),
     });
 
     if (!resp.ok) {
@@ -264,6 +266,36 @@ const formatDate = (dateStr: string) => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 };
 
+// ─── Code Block with Copy ──────────────────────────
+const CodeBlock = ({ children }: { children: React.ReactNode }) => {
+  const [copied, setCopied] = useState(false);
+  const text = String(children).replace(/\n$/, '');
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group my-2">
+      <div className="absolute top-2 right-2 flex items-center pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground bg-background/80 hover:bg-background border border-border/50 shadow-sm"
+          onClick={copyToClipboard}
+        >
+          {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+        </Button>
+      </div>
+      <code className="block bg-background/60 rounded-xl p-3 pr-10 text-[11px] leading-relaxed overflow-x-auto border border-border/30 whitespace-pre-wrap">
+        {children}
+      </code>
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════
@@ -282,6 +314,9 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
   const [isClosing, setIsClosing] = useState(false);
   const [selectedModel, setSelectedModel] = useState(() => {
     return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL;
+  });
+  const [agentType, setAgentType] = useState<"autozap" | "general" | "prompt-creator">(() => {
+    return (localStorage.getItem("ai-chat-agent-type") as "autozap" | "general" | "prompt-creator") || "autozap";
   });
 
   // Microphone state
@@ -308,6 +343,10 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
   useEffect(() => {
     localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
   }, [selectedModel]);
+
+  useEffect(() => {
+    localStorage.setItem("ai-chat-agent-type", agentType);
+  }, [agentType]);
 
   // ─── Persist conversations ─────────────────────
   useEffect(() => {
@@ -370,11 +409,7 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
     code: ({ children, className }) => {
       const isBlock = className?.includes('language-');
       if (isBlock) {
-        return (
-          <code className="block bg-background/60 rounded-lg p-3 my-2 text-xs overflow-x-auto">
-            {children}
-          </code>
-        );
+        return <CodeBlock>{children}</CodeBlock>;
       }
       return <code className="bg-background/60 px-1.5 py-0.5 rounded text-xs">{children}</code>;
     },
@@ -527,6 +562,7 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
     await streamChat({
       messages: apiMessages,
       model: selectedModel,
+      type: agentType,
       onDelta: upsertAssistant,
       onDone: () => setIsLoading(false),
       onError: (error) => {
@@ -715,18 +751,74 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
           {/* Top bar with close + maximize */}
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ai-icon-hover border border-primary/20">
-                  <Sparkles className="h-4 w-4 text-primary ai-sparkle-animate" />
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-background" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm leading-tight">Assistente IA</h3>
-                <p className="text-[10px] text-muted-foreground leading-tight flex items-center gap-1">
-                  {modelInfo.icon} {modelInfo.label}
-                </p>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2.5 text-left outline-none rounded-lg p-1 hover:bg-muted/50 transition-colors -ml-1">
+                    <div className="relative">
+                      <div className={cn(
+                        "h-9 w-9 rounded-xl flex items-center justify-center ai-icon-hover border",
+                        agentType === "autozap" && "bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20",
+                        agentType === "general" && "bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/20",
+                        agentType === "prompt-creator" && "bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/20"
+                      )}>
+                        {agentType === "autozap" && <Sparkles className="h-4 w-4 text-primary ai-sparkle-animate" />}
+                        {agentType === "general" && <Globe className="h-4 w-4 text-blue-500" />}
+                        {agentType === "prompt-creator" && <Wand2 className="h-4 w-4 text-purple-500" />}
+                      </div>
+                      <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-background" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
+                        {agentType === "autozap" && "Assistente Autozap"}
+                        {agentType === "general" && "Assistente Geral"}
+                        {agentType === "prompt-creator" && "Criador de Prompts"}
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground leading-tight flex items-center gap-1">
+                        {modelInfo.label}
+                      </p>
+                    </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56 z-[200]">
+                  <DropdownMenuItem
+                    onClick={() => setAgentType("autozap")}
+                    className={cn("gap-2", agentType === "autozap" && "bg-accent")}
+                  >
+                    <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3 w-3 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">AutoZap</p>
+                      <p className="text-[10px] text-muted-foreground">Responde sobre a plataforma</p>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setAgentType("prompt-creator")}
+                    className={cn("gap-2", agentType === "prompt-creator" && "bg-accent")}
+                  >
+                    <div className="h-6 w-6 rounded bg-purple-500/10 flex items-center justify-center shrink-0">
+                      <Wand2 className="h-3 w-3 text-purple-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Criador de Prompts</p>
+                      <p className="text-[10px] text-muted-foreground">Cria instruções para seus agentes</p>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setAgentType("general")}
+                    className={cn("gap-2", agentType === "general" && "bg-accent")}
+                  >
+                    <div className="h-6 w-6 rounded bg-blue-500/10 flex items-center justify-center shrink-0">
+                      <Globe className="h-3 w-3 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Geral</p>
+                      <p className="text-[10px] text-muted-foreground">Pesquisas livres e assuntos externos</p>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-0.5">
               <Tooltip>
@@ -813,7 +905,6 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
                 {MODELS.map(m => (
                   <SelectItem key={m.id} value={m.id} className="text-xs">
                     <span className="flex items-center gap-2">
-                      <span>{m.icon}</span>
                       <span>{m.label}</span>
                       <span className="text-muted-foreground text-[10px]">({m.provider})</span>
                     </span>
@@ -858,15 +949,32 @@ export const AIChatSidebar = ({ isOpen, onClose, isOverlay = false }: AIChatSide
           <div className="space-y-4">
             {messages.length === 0 && !isLoading && (
               <div className="flex flex-col items-center justify-center py-16 text-center ai-message-animate">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 border border-primary/10">
-                  <Sparkles className="h-7 w-7 text-primary" />
+                <div className={cn(
+                  "h-16 w-16 rounded-2xl flex items-center justify-center mb-4 border",
+                  agentType === "autozap" && "bg-gradient-to-br from-primary/20 to-primary/5 border-primary/10",
+                  agentType === "general" && "bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/10",
+                  agentType === "prompt-creator" && "bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/10"
+                )}>
+                  {agentType === "autozap" && <Sparkles className="h-7 w-7 text-primary" />}
+                  {agentType === "general" && <Globe className="h-7 w-7 text-blue-500" />}
+                  {agentType === "prompt-creator" && <Wand2 className="h-7 w-7 text-purple-500" />}
                 </div>
-                <h4 className="font-medium text-sm mb-1">Como posso ajudar?</h4>
+                <h4 className="font-medium text-sm mb-1">
+                  {agentType === "autozap" && "Como posso ajudar?"}
+                  {agentType === "general" && "Pesquisa Livre"}
+                  {agentType === "prompt-creator" && "Criador de Prompts"}
+                </h4>
                 <p className="text-xs text-muted-foreground max-w-[240px] leading-relaxed">
-                  Pergunte sobre funcionalidades, peça ajuda para configurar ou tire dúvidas sobre a plataforma.
+                  {agentType === "autozap" && "Pergunte sobre funcionalidades, peça ajuda para configurar ou tire dúvidas sobre a plataforma."}
+                  {agentType === "general" && "Faça pesquisas, peça traduções, resumos, gere textos ou converse sobre qualquer assunto."}
+                  {agentType === "prompt-creator" && "Descreva seu negócio e o papel do agente para gerar um prompt estruturado."}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2 mt-4">
-                  {["Como criar um agente?", "Conectar WhatsApp", "IA não responde"].map((q, i) => (
+                  {(
+                    agentType === "autozap" ? ["Como criar um agente?", "Conectar WhatsApp", "IA não responde"] :
+                      agentType === "general" ? ["Escreva um e-mail de vendas", "Ideias de marketing", "Traduza um texto"] :
+                        ["Agente de suporte técnico", "Agente de vendas de carros", "Agente para clínica de estética"]
+                  ).map((q, i) => (
                     <button
                       key={i}
                       className="text-[11px] px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border border-border/50"

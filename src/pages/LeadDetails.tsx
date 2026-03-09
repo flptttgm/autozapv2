@@ -449,13 +449,11 @@ const LeadDetails = () => {
   };
 
   const handleSendMessage = async () => {
-    // Try to find an existing DIRECT conversation for this lead
+    // Try to find an existing conversation for this lead (individual or group)
     const { data, error } = await supabase
       .from("messages")
       .select("chat_id")
       .eq("lead_id", id!)
-      .eq("direction", "inbound")
-      .eq("is_group", false)
       .not("message_type", "eq", "note")
       .order("created_at", { ascending: false })
       .limit(1);

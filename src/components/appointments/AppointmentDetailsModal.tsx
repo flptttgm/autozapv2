@@ -881,7 +881,7 @@ export const AppointmentDetailsModal = ({
                       Reagendar
                     </Button>
                   </div>
-                  {appointment.status === "scheduled" && (
+                  {(appointment.status === "scheduled" || appointment.status === "rescheduled") && (
                     <Button onClick={handleConfirm} className="w-full h-10 gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20">
                       <CheckCircle2 className="h-4 w-4" />
                       Confirmar

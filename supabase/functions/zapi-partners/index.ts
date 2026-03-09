@@ -321,7 +321,25 @@ serve(async (req) => {
 
         const statusData = await statusResponse.json();
         const isConnected = statusData.connected === true || statusData.status === 'connected';
-        const phone = statusData.phone || statusData.smartphoneConnected?.phone;
+        let phone = statusData.phone || statusData.smartphoneConnected?.phone;
+
+        // Fallback: if connected but no phone from /status, try /device endpoint
+        if (isConnected && !phone) {
+          try {
+            const deviceUrl = `https://api.z-api.io/instances/${instance.instance_id}/token/${instance.instance_token}/device`;
+            const deviceResponse = await fetch(deviceUrl, {
+              method: 'GET',
+              headers: { 'Client-Token': CLIENT_TOKEN },
+            });
+            if (deviceResponse.ok) {
+              const deviceData = await deviceResponse.json();
+              phone = deviceData.phone || null;
+              console.log(`[status] Phone from /device endpoint: ${phone}`);
+            }
+          } catch (err) {
+            console.warn('[status] /device fallback failed:', err);
+          }
+        }
 
         // CRITICAL: Check subscription status from Z-API response
         // FIX: Use strict equality - Z-API returns undefined/null during trial period

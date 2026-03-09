@@ -168,7 +168,7 @@ export const LeadCard = ({ lead, onClick, isSelectionMode, isSelected, onSelect 
                               "bg-red-500/15 text-red-500 dark:text-red-400"
                       )}
                     >
-                      🎯 {lead.score}
+                      {lead.score}
                     </Badge>
                   )}
                 </div>

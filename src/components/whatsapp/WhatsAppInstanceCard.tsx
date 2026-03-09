@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { AIPreviewChat } from "./AIPreviewChat";
 import { PhoneCodeConnection } from "./PhoneCodeConnection";
 import { MobileRegistration, MobileRegistrationState } from "./MobileRegistration";
 import { AIModeSelector } from "./AIModeSelector";
@@ -846,36 +845,36 @@ export const WhatsAppInstanceCard = ({
   }
 
   return (
-    <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg glass shadow-sm ${isConnected
-      ? 'border-green-500/30 bg-gradient-to-br from-green-500/5 via-transparent to-transparent'
-      : 'border-destructive/30 bg-gradient-to-br from-destructive/5 via-transparent to-transparent'
+    <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl glass shadow-md h-full flex flex-col ${isConnected
+      ? 'border-green-500/20 bg-gradient-to-br from-green-500/[0.03] via-transparent to-transparent'
+      : 'border-red-500/20 bg-gradient-to-br from-red-500/[0.03] via-transparent to-transparent'
       }`}>
       {/* Status indicator bar */}
-      <div className={`absolute top-0 left-0 right-0 h-1 ${isConnected ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-destructive to-orange-500'
+      <div className={`absolute top-0 left-0 right-0 h-[2px] ${isConnected ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-400' : 'bg-gradient-to-r from-red-500 via-orange-500 to-amber-500'
         }`} />
 
-      <div className="p-4 sm:p-6 pt-4 sm:pt-5">
+      <div className="p-4 sm:p-6 pt-4 sm:pt-5 flex-1 flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between mb-4 sm:mb-5">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg ${isConnected
-              ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-              : 'bg-gradient-to-br from-gray-400 to-gray-500'
+            <div className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${isConnected
+              ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/25 shadow-lg'
+              : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-lg'
               }`}>
-              <Smartphone className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <Smartphone className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               {/* Connection pulse */}
               {isConnected && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 items-center justify-center">
-                    <Wifi className="w-2.5 h-2.5 text-white" />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-500 items-center justify-center ring-2 ring-background">
+                    <Wifi className="w-2 h-2 text-white" />
                   </span>
                 </span>
               )}
               {!isConnected && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-destructive items-center justify-center">
-                    <WifiOff className="w-2.5 h-2.5 text-white" />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 items-center justify-center ring-2 ring-background">
+                    <WifiOff className="w-2 h-2 text-white" />
                   </span>
                 </span>
               )}
@@ -924,256 +923,226 @@ export const WhatsAppInstanceCard = ({
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 mb-1 group">
-                  <h3 className="font-bold text-base sm:text-lg truncate">
+                <div className="flex items-center gap-2 mb-0.5 group">
+                  <h3 className="font-semibold text-sm sm:text-base truncate">
                     {instance.display_name || displayPhone || `Instância`}
                   </h3>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => {
                       setEditName(instance.display_name || "");
                       setIsEditingName(true);
                     }}
                   >
-                    <Pencil className="w-3 h-3 text-muted-foreground" />
+                    <Pencil className="w-2.5 h-2.5 text-muted-foreground" />
                   </Button>
                 </div>
               )}
 
-              {/* Phone number when display_name is set */}
-              {instance.display_name && displayPhone && (
-                <p className="text-xs text-muted-foreground mb-1">{displayPhone}</p>
+              {/* Phone number when connected */}
+              {isConnected && displayPhone && (
+                <p className="text-[11px] text-muted-foreground mb-1 font-mono">{displayPhone}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant={isConnected ? "default" : "destructive"}
-                  className={`text-[10px] sm:text-xs font-medium ${isConnected
-                    ? 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30 hover:bg-green-500/20'
-                    : 'bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20'
+                  className={`text-[10px] font-medium px-2 py-0 h-5 ${isConnected
+                    ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 hover:bg-green-500/15'
+                    : 'bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20 hover:bg-red-500/15'
                     }`}
                 >
                   {isConnected ? (
-                    <><Signal className="w-3 h-3 mr-1" /> Online</>
+                    <><Signal className="w-2.5 h-2.5 mr-1" /> Online</>
                   ) : (
-                    <><WifiOff className="w-3 h-3 mr-1" /> Offline</>
+                    <><WifiOff className="w-2.5 h-2.5 mr-1" /> Offline</>
                   )}
                 </Badge>
                 {isPaused && isConnected && (
                   <Badge
                     variant="secondary"
-                    className="text-[10px] sm:text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    className="text-[10px] font-medium px-2 py-0 h-5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                   >
-                    <Pause className="w-3 h-3 mr-1" /> IA Pausada
+                    <Pause className="w-2.5 h-2.5 mr-1" /> IA Pausada
                   </Badge>
                 )}
-                <span className="text-[10px] sm:text-xs text-muted-foreground font-mono">
-                  #{instance.instance_id.substring(0, 6)}
-                </span>
               </div>
             </div>
           </div>
         </div>
 
         {isConnected ? (
-          <Tabs defaultValue="status" className="w-full">
-            <TabsList className="w-full grid grid-cols-2 mb-4">
-              <TabsTrigger value="status" className="text-xs sm:text-sm gap-1.5">
-                <Signal className="w-3.5 h-3.5" />
-                Status
-              </TabsTrigger>
-              <TabsTrigger value="preview" className="text-xs sm:text-sm gap-1.5">
-                <FlaskConical className="w-3.5 h-3.5" />
-                Preview IA
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="status" className="mt-0 space-y-4 sm:space-y-5">
-              {/* Message Statistics - Responsivo */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="p-2 sm:p-3 rounded-xl bg-muted/50 border border-border text-center">
-                  <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-1">
-                    <ArrowDownLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
-                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline">Recebidas</span>
-                  </div>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{messageStats?.inbound || 0}</p>
-                  <span className="text-[10px] text-muted-foreground sm:hidden">Receb.</span>
+          <div className="space-y-3">
+            {/* Message Statistics */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                <div className="flex items-center justify-center gap-1 mb-0.5">
+                  <ArrowDownLeft className="w-3 h-3 text-blue-500" />
+                  <span className="text-[10px] font-medium text-muted-foreground hidden sm:inline">Recebidas</span>
                 </div>
-                <div className="p-2 sm:p-3 rounded-xl bg-muted/50 border border-border text-center">
-                  <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-1">
-                    <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" />
-                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline">Enviadas</span>
-                  </div>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{messageStats?.outbound || 0}</p>
-                  <span className="text-[10px] text-muted-foreground sm:hidden">Env.</span>
-                </div>
-                <div className="p-2 sm:p-3 rounded-xl bg-muted/50 border border-border text-center">
-                  <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-1">
-                    <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
-                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline">Total</span>
-                  </div>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{messageStats?.total || 0}</p>
-                  <span className="text-[10px] text-muted-foreground sm:hidden">Total</span>
-                </div>
+                <p className="text-base sm:text-lg font-bold text-foreground tabular-nums">{messageStats?.inbound || 0}</p>
+                <span className="text-[10px] text-muted-foreground sm:hidden">Receb.</span>
               </div>
-
-              {/* Status message */}
-              {isPaused ? (
-                <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-                    <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 font-medium">
-                    <span className="sm:hidden">IA pausada</span>
-                    <span className="hidden sm:inline">IA pausada - mensagens não serão respondidas automaticamente</span>
-                  </span>
+              <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                <div className="flex items-center justify-center gap-1 mb-0.5">
+                  <ArrowUpRight className="w-3 h-3 text-green-500" />
+                  <span className="text-[10px] font-medium text-muted-foreground hidden sm:inline">Enviadas</span>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-green-500/10 border border-green-500/20">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium">
-                    <span className="sm:hidden">Pronto para mensagens</span>
-                    <span className="hidden sm:inline">Pronto para enviar e receber mensagens</span>
-                  </span>
-                </div>
-              )}
-
-
-              {/* AI Mode Selector */}
-              <div className="p-3 rounded-xl bg-muted/30 border border-border space-y-4">
-                <AIModeSelector
-                  instanceId={instance.id}
-                  workspaceId={instance.workspace_id}
-                  currentMode={instance.ai_mode || "all"}
-                  onModeChange={onStatusChange}
-                />
-                <div className="border-t border-border pt-3">
-                  <MessageBufferSelector
-                    instanceId={instance.id}
-                    currentBufferSeconds={(instance as any).message_buffer_seconds || 0}
-                    onBufferChange={onStatusChange}
-                  />
-                </div>
+                <p className="text-base sm:text-lg font-bold text-foreground tabular-nums">{messageStats?.outbound || 0}</p>
+                <span className="text-[10px] text-muted-foreground sm:hidden">Env.</span>
               </div>
-
-              {/* Actions - Empilhados em Mobile */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                <Button
-                  onClick={handleTogglePause}
-                  variant={isPaused ? "default" : "secondary"}
-                  size="sm"
-                  disabled={isTogglingPause}
-                  className={`w-full sm:w-auto gap-2 shadow-sm ${isPaused
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-                    }`}
-                >
-                  {isTogglingPause ? (
-                    <Loader2 className="animate-spin w-4 h-4" />
-                  ) : isPaused ? (
-                    <Play className="w-4 h-4" />
-                  ) : (
-                    <Pause className="w-4 h-4" />
-                  )}
-                  {isPaused ? "Retomar IA" : "Pausar IA"}
-                </Button>
-
-                <Button
-                  onClick={handleDisconnect}
-                  variant="destructive"
-                  size="sm"
-                  disabled={isLoading}
-                  className="w-full sm:w-auto gap-2 shadow-sm"
-                >
-                  {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Power className="w-4 h-4" />}
-                  Desconectar
-                </Button>
-
-                <div className="flex gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          onClick={handleRestart}
-                          disabled={isLoading}
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 sm:flex-none gap-2"
-                        >
-                          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                          <span className="sm:hidden">Reiniciar</span>
-                          <span className="hidden sm:inline">Reiniciar</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Use quando mensagens não estão sendo enviadas/recebidas</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={isLoading}
-                        className="w-full sm:w-auto gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="sm:hidden">Excluir</span>
-                        <span className="hidden sm:inline">Excluir</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir Instância?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação não pode ser desfeita. A instância será removida do sistema e você precisará escanear um novo QR Code caso queira usá-la novamente.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDelete}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+              <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                <div className="flex items-center justify-center gap-1 mb-0.5">
+                  <MessageSquare className="w-3 h-3 text-primary" />
+                  <span className="text-[10px] font-medium text-muted-foreground hidden sm:inline">Total</span>
                 </div>
+                <p className="text-base sm:text-lg font-bold text-foreground tabular-nums">{messageStats?.total || 0}</p>
+                <span className="text-[10px] text-muted-foreground sm:hidden">Total</span>
               </div>
-            </TabsContent>
+            </div>
 
-            <TabsContent value="preview" className="mt-0">
-              <AIPreviewChat
+            {/* Status message */}
+            {isPaused ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/15">
+                <div className="w-6 h-6 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                  <Pause className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                  <span className="sm:hidden">IA pausada</span>
+                  <span className="hidden sm:inline">IA pausada — mensagens não serão respondidas automaticamente</span>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/8 border border-green-500/15">
+                <div className="w-6 h-6 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                </div>
+                <span className="text-xs text-green-700 dark:text-green-300 font-medium">
+                  <span className="sm:hidden">Pronto para mensagens</span>
+                  <span className="hidden sm:inline">Pronto para enviar e receber mensagens</span>
+                </span>
+              </div>
+            )}
+
+            {/* AI Mode Selector */}
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-3">
+              <AIModeSelector
+                instanceId={instance.id}
                 workspaceId={instance.workspace_id}
-                templateId={instance.ai_template_id || null}
-                templateName="Agente Atual"
+                currentMode={instance.ai_mode || "all"}
+                onModeChange={onStatusChange}
               />
-            </TabsContent>
-          </Tabs>
+              <div className="border-t border-border/50 pt-3">
+                <MessageBufferSelector
+                  instanceId={instance.id}
+                  currentBufferSeconds={(instance as any).message_buffer_seconds || 0}
+                  onBufferChange={onStatusChange}
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                onClick={handleTogglePause}
+                variant="outline"
+                size="sm"
+                disabled={isTogglingPause}
+                className={`flex-1 gap-1.5 h-8 text-xs font-medium transition-colors ${isPaused
+                  ? 'border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/10 hover:border-green-500/50'
+                  : 'border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50'
+                  }`}
+              >
+                {isTogglingPause ? (
+                  <Loader2 className="animate-spin w-3.5 h-3.5" />
+                ) : isPaused ? (
+                  <Play className="w-3.5 h-3.5" />
+                ) : (
+                  <Pause className="w-3.5 h-3.5" />
+                )}
+                {isPaused ? "Retomar IA" : "Pausar IA"}
+              </Button>
+
+              <Button
+                onClick={handleDisconnect}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                className="flex-1 gap-1.5 h-8 text-xs font-medium border-red-500/30 text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
+              >
+                {isLoading ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                Desconectar
+              </Button>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleRestart}
+                      disabled={isLoading}
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reiniciar — use quando mensagens não chegam</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={isLoading}
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir Instância?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. A instância será removida do sistema e você precisará escanear um novo QR Code caso queira usá-la novamente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+
+          </div>
         ) : (
-          <div className="space-y-4 sm:space-y-5">
+          <div className="space-y-3">
             {/* Message Statistics (compact for disconnected) */}
             {(messageStats?.total || 0) > 0 && (
-              <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 rounded-lg bg-muted/30 border border-border/50 text-xs sm:text-sm">
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <ArrowDownLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
-                  <span className="text-muted-foreground">{messageStats?.inbound || 0}</span>
+              <div className="flex items-center justify-center gap-3 p-2 rounded-lg bg-muted/30 border border-border/40 text-xs">
+                <div className="flex items-center gap-1">
+                  <ArrowDownLeft className="w-3 h-3 text-blue-500" />
+                  <span className="text-muted-foreground tabular-nums">{messageStats?.inbound || 0}</span>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" />
-                  <span className="text-muted-foreground">{messageStats?.outbound || 0}</span>
+                <div className="flex items-center gap-1">
+                  <ArrowUpRight className="w-3 h-3 text-green-500" />
+                  <span className="text-muted-foreground tabular-nums">{messageStats?.outbound || 0}</span>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
-                  <span className="font-medium">{messageStats?.total || 0}</span>
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3 text-primary" />
+                  <span className="font-medium tabular-nums">{messageStats?.total || 0}</span>
                 </div>
               </div>
             )}

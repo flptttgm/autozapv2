@@ -36,7 +36,10 @@ const STATUS_WEIGHTS: Record<string, number> = {
   prospect: 10,
   contacted: 40,
   qualified: 70,
+  proposal: 80,
+  negotiation: 85,
   converted: 100,
+  won: 100,
   lost: 0,
 };
 

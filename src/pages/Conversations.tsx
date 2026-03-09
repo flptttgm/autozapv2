@@ -1121,8 +1121,8 @@ const MemoizedChatContent = memo(function ChatContent({
                 {messages?.map((msg, index) => {
                   const showDateSeparator =
                     index === 0 ||
-                    !isToday(new Date(messages[index - 1].created_at!)) ||
-                    !isToday(new Date(msg.created_at!));
+                    new Date(messages[index - 1].created_at!).toDateString() !==
+                    new Date(msg.created_at!).toDateString();
 
                   return (
                     <div key={msg.id}>
@@ -1170,7 +1170,7 @@ const MemoizedChatContent = memo(function ChatContent({
                               )}
                             </div>
                           )}
-                          {msg.direction === "inbound" && (
+                          {msg.direction === "inbound" && isGroupHeader && (
                             <div className="flex items-center gap-1.5 px-1">
                               <User className="h-3 w-3 text-muted-foreground" />
                               <span className="text-xs text-muted-foreground">

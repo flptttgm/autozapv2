@@ -23,14 +23,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Search, 
-  User, 
-  Loader2, 
-  MessageSquarePlus, 
-  Smartphone, 
-  Users, 
-  CheckSquare, 
+import {
+  Search,
+  User,
+  Loader2,
+  MessageSquarePlus,
+  Smartphone,
+  Users,
+  CheckSquare,
   Square,
   X
 } from "lucide-react";
@@ -71,7 +71,7 @@ export function NewConversationDialog({
     queryKey: ["whatsapp-instances-connected", workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
-      
+
       const { data, error } = await supabase
         .from("whatsapp_instances")
         .select("id, instance_id, phone, status")
@@ -89,10 +89,10 @@ export function NewConversationDialog({
     queryKey: ["leads-search", searchTerm, isMultiSelect, workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [];
-      
+
       let query = supabase
         .from("leads")
-        .select("id, name, phone, email, metadata")
+        .select("id, name, phone, email, metadata, avatar_url")
         .eq("workspace_id", workspaceId)
         .not("phone", "like", "%-%")
         .order("name", { ascending: true })
@@ -132,9 +132,9 @@ export function NewConversationDialog({
 
       const existingChat = existingChats?.find((c) => c.lead_id === selectedLead.id);
       const chatId = existingChat?.chat_id || selectedLead.phone;
-      
-      const instance = selectedInstance 
-        ? instances.find((i) => i.id === selectedInstance) 
+
+      const instance = selectedInstance
+        ? instances.find((i) => i.id === selectedInstance)
         : instances[0];
 
       const { data, error } = await supabase.functions.invoke("manual-inbox", {
@@ -181,8 +181,8 @@ export function NewConversationDialog({
         throw new Error("Nenhuma conexão WhatsApp disponível");
       }
 
-      const instance = selectedInstance 
-        ? instances.find((i) => i.id === selectedInstance) 
+      const instance = selectedInstance
+        ? instances.find((i) => i.id === selectedInstance)
         : instances[0];
 
       setSendProgress({ current: 0, total: selectedLeads.length, isActive: true });
@@ -268,7 +268,7 @@ export function NewConversationDialog({
 
   const handleSelectAll = () => {
     if (!leads) return;
-    
+
     if (selectedLeads.length === leads.length) {
       setSelectedLeads([]);
     } else {
@@ -290,7 +290,7 @@ export function NewConversationDialog({
     return selectedLeads.some(l => l.id === leadId);
   };
 
-  const canSend = isMultiSelect 
+  const canSend = isMultiSelect
     ? selectedLeads.length > 0 && message.trim() && instances && instances.length > 0
     : selectedLead && message.trim() && instances && instances.length > 0;
 
@@ -298,26 +298,41 @@ export function NewConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] sm:w-[500px] max-w-[95vw] overflow-x-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageSquarePlus className="h-5 w-5 text-primary" />
-            Nova Conversa
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-[95vw] sm:w-[520px] max-w-[95vw] overflow-x-hidden p-0 gap-0">
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-border/40">
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/80 to-transparent" />
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 border border-primary/20">
+                <MessageSquarePlus className="h-4.5 w-4.5 text-primary" />
+              </div>
+              <div>
+                <span className="text-base font-semibold">Nova Conversa</span>
+                <p className="text-xs font-normal text-muted-foreground mt-0.5">
+                  {isMultiSelect ? "Envie para múltiplos contatos" : "Inicie uma conversa direta"}
+                </p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-4 py-4 min-w-0">
+        <div className="space-y-4 px-6 py-5 min-w-0">
           {/* Mode Toggle */}
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              {isMultiSelect ? (
-                <Users className="h-4 w-4 text-primary" />
-              ) : (
-                <User className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="text-sm font-medium">
-                {isMultiSelect ? "Envio em Massa" : "Conversa Individual"}
-              </span>
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-muted/30">
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isMultiSelect ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                }`}>
+                {isMultiSelect ? <Users className="h-4 w-4" /> : <User className="h-4 w-4" />}
+              </div>
+              <div>
+                <span className="text-sm font-medium block">
+                  {isMultiSelect ? "Envio em Massa" : "Conversa Individual"}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {isMultiSelect ? "Selecione múltiplos destinatários" : "Conversa 1 para 1"}
+                </span>
+              </div>
             </div>
             <Switch
               checked={isMultiSelect}
@@ -328,9 +343,9 @@ export function NewConversationDialog({
 
           {/* WhatsApp Instance Selection */}
           {instances && instances.length > 1 && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <Smartphone className="h-3.5 w-3.5" />
                 Instância WhatsApp
               </Label>
               <Select value={selectedInstance} onValueChange={setSelectedInstance}>
@@ -350,21 +365,22 @@ export function NewConversationDialog({
 
           {/* No WhatsApp Connected Warning */}
           {(!instances || instances.length === 0) && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-sm text-destructive flex items-center gap-2.5">
+              <Smartphone className="h-4 w-4 shrink-0 opacity-70" />
               Nenhuma conexão WhatsApp ativa. Conecte um WhatsApp antes de iniciar conversas.
             </div>
           )}
 
           {/* Lead Search */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <User className="h-4 w-4" />
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <User className="h-3.5 w-3.5" />
               {isMultiSelect ? `Selecionar ${terminology.plural}` : `Selecionar ${terminology.singular}`}
             </Label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
               <Input
-                placeholder={`Buscar por nome ou telefone...`}
+                placeholder="Buscar por nome ou telefone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full max-w-full"
@@ -379,7 +395,7 @@ export function NewConversationDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleSelectAll}
-                className="text-xs"
+                className="text-xs h-7"
                 disabled={isPending}
               >
                 {selectedLeads.length === leads.length ? (
@@ -394,67 +410,74 @@ export function NewConversationDialog({
                   </>
                 )}
               </Button>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-[10px] font-medium bg-primary/10 text-primary border-0">
                 {selectedLeads.length} selecionado{selectedLeads.length !== 1 ? "s" : ""}
               </Badge>
             </div>
           )}
 
           {/* Lead List */}
-          <div className="h-48 border rounded-lg overflow-hidden bg-background">
+          <div className="h-56 rounded-xl border border-border/40 overflow-hidden">
             <ScrollArea className="h-full">
               {isLoadingLeads ? (
-                <div className="flex items-center justify-center h-48">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className="flex flex-col items-center justify-center h-56 gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary/50" />
+                  <span className="text-xs text-muted-foreground">Buscando contatos...</span>
                 </div>
               ) : leads?.length === 0 ? (
-                <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-                  Nenhum {terminology.singular.toLowerCase()} encontrado
+                <div className="flex flex-col items-center justify-center h-56 text-muted-foreground gap-1.5">
+                  <User className="h-6 w-6 opacity-30" />
+                  <span className="text-sm">Nenhum {terminology.singular.toLowerCase()} encontrado</span>
                 </div>
               ) : (
-                <div className="p-2 space-y-1">
+                <div className="p-1.5 space-y-0.5">
                   {leads?.map((lead) => {
-                    const leadPhoto = (lead.metadata as any)?.photo;
-                    const isSelected = isMultiSelect 
+                    const leadPhoto = (lead as any).avatar_url || (lead.metadata as any)?.photo;
+                    const isSelected = isMultiSelect
                       ? isLeadSelected(lead.id)
                       : selectedLead?.id === lead.id;
+                    const initials = (lead.name || "?")
+                      .split(" ")
+                      .slice(0, 2)
+                      .map((n: string) => n[0])
+                      .join("")
+                      .toUpperCase();
 
                     return (
                       <button
                         key={lead.id}
                         onClick={() => handleSelectLead(lead)}
                         disabled={isPending}
-                        className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
-                          isSelected
-                            ? "bg-primary/10 border border-primary/30"
-                            : "bg-muted/50 hover:bg-accent"
-                        } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg transition-all text-left ${isSelected
+                            ? "bg-primary/10 ring-1 ring-primary/30"
+                            : "hover:bg-muted/50"
+                          } ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         {isMultiSelect && (
                           <div className="flex-shrink-0">
                             {isSelected ? (
                               <CheckSquare className="h-4 w-4 text-primary" />
                             ) : (
-                              <Square className="h-4 w-4 text-muted-foreground" />
+                              <Square className="h-4 w-4 text-muted-foreground/50" />
                             )}
                           </div>
                         )}
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          {leadPhoto && <AvatarImage src={leadPhoto} />}
-                          <AvatarFallback className="bg-primary/10">
-                            <User className="h-4 w-4 text-primary" />
+                        <Avatar className="h-9 w-9 flex-shrink-0">
+                          {leadPhoto && <AvatarImage src={leadPhoto} className="object-cover" />}
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
+                            {initials}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate text-sm">
                             {lead.name || "Sem nome"}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-[11px] text-muted-foreground truncate">
                             {lead.phone}
                           </p>
                         </div>
                         {!isMultiSelect && isSelected && (
-                          <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                          <div className="h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
                         )}
                       </button>
                     );
@@ -470,7 +493,7 @@ export function NewConversationDialog({
               <Label className="text-xs text-muted-foreground">
                 {selectedLeads.length} {terminology.plural.toLowerCase()} selecionado{selectedLeads.length !== 1 ? "s" : ""}
               </Label>
-              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+              <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
                 {selectedLeads.slice(0, 10).map((lead) => (
                   <Badge
                     key={lead.id}
@@ -482,7 +505,7 @@ export function NewConversationDialog({
                     </span>
                     <button
                       onClick={() => handleRemoveSelectedLead(lead.id)}
-                      className="hover:bg-muted rounded p-0.5"
+                      className="hover:bg-destructive/10 hover:text-destructive rounded p-0.5 transition-colors"
                       disabled={isPending}
                     >
                       <X className="h-3 w-3" />
@@ -490,7 +513,7 @@ export function NewConversationDialog({
                   </Badge>
                 ))}
                 {selectedLeads.length > 10 && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs border-dashed">
                     +{selectedLeads.length - 10} mais
                   </Badge>
                 )}
@@ -500,25 +523,28 @@ export function NewConversationDialog({
 
           {/* Selected Lead Display (Single) */}
           {!isMultiSelect && selectedLead && (
-            <div className="bg-accent/50 rounded-lg p-3 flex items-center gap-3">
-              <Avatar className="h-10 w-10 flex-shrink-0">
-                {(selectedLead.metadata as any)?.photo && (
-                  <AvatarImage src={(selectedLead.metadata as any)?.photo} />
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
+              <Avatar className="h-10 w-10 flex-shrink-0 ring-1 ring-primary/20">
+                {((selectedLead as any).avatar_url || (selectedLead.metadata as any)?.photo) && (
+                  <AvatarImage src={(selectedLead as any).avatar_url || (selectedLead.metadata as any)?.photo} className="object-cover" />
                 )}
-                <AvatarFallback className="bg-primary/10">
-                  <User className="h-5 w-5 text-primary" />
+                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold text-sm">
+                  {(selectedLead.name || "?").split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
-                <p className="font-medium truncate">{selectedLead.name || "Sem nome"}</p>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold truncate">{selectedLead.name || "Sem nome"}</p>
                 <p className="text-sm text-muted-foreground truncate">{selectedLead.phone}</p>
               </div>
+              <Badge className="bg-primary/15 text-primary border-0 text-[10px] font-semibold shrink-0">
+                Selecionado
+              </Badge>
             </div>
           )}
 
           {/* Message Input */}
-          <div className="space-y-2">
-            <Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {isMultiSelect ? "Mensagem (será enviada para todos)" : "Primeira Mensagem"}
             </Label>
             <Textarea
@@ -533,26 +559,29 @@ export function NewConversationDialog({
 
           {/* Send Progress */}
           {sendProgress.isActive && (
-            <div className="space-y-2">
+            <div className="space-y-2 p-3 rounded-xl bg-primary/5 border border-primary/15">
               <div className="flex items-center justify-between text-sm">
-                <span>Enviando mensagens...</span>
-                <span className="text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  <span className="font-medium">Enviando mensagens...</span>
+                </div>
+                <span className="text-muted-foreground text-xs tabular-nums">
                   {sendProgress.current}/{sendProgress.total}
                 </span>
               </div>
-              <Progress 
-                value={(sendProgress.current / sendProgress.total) * 100} 
-                className="h-2"
+              <Progress
+                value={(sendProgress.current / sendProgress.total) * 100}
+                className="h-1.5"
               />
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleClose} 
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 px-6 py-4 border-t border-border/40">
+          <Button
+            variant="ghost"
+            onClick={handleClose}
             className="w-full sm:w-auto"
             disabled={isPending}
           >
@@ -561,19 +590,25 @@ export function NewConversationDialog({
           <Button
             onClick={() => isMultiSelect ? massSendMutation.mutate() : createConversationMutation.mutate()}
             disabled={!canSend || isPending}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto font-semibold"
           >
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {sendProgress.isActive 
-                  ? `${sendProgress.current}/${sendProgress.total}` 
+                {sendProgress.isActive
+                  ? `${sendProgress.current}/${sendProgress.total}`
                   : "Enviando..."}
               </>
             ) : isMultiSelect ? (
-              `Enviar para ${selectedLeads.length} ${selectedLeads.length === 1 ? terminology.singular.toLowerCase() : terminology.plural.toLowerCase()}`
+              <>
+                <Users className="h-4 w-4 mr-2" />
+                {`Enviar para ${selectedLeads.length} ${selectedLeads.length === 1 ? terminology.singular.toLowerCase() : terminology.plural.toLowerCase()}`}
+              </>
             ) : (
-              "Iniciar Conversa"
+              <>
+                <MessageSquarePlus className="h-4 w-4 mr-2" />
+                Iniciar Conversa
+              </>
             )}
           </Button>
         </div>
@@ -581,3 +616,4 @@ export function NewConversationDialog({
     </Dialog>
   );
 }
+

@@ -376,8 +376,8 @@ export const DashboardHeader = ({
 
       {/* ─── Right: Greeting + Actions ─── */}
       <div className="flex items-center gap-1">
-        {/* Greeting — desktop only, hidden on conversations and appointments page */}
-        {!location.pathname.startsWith("/conversations") && !location.pathname.startsWith("/appointments") && (
+        {/* Greeting — desktop only, hidden on conversations page */}
+        {!location.pathname.startsWith("/conversations") && (
           <div className="hidden md:flex items-center gap-3 min-w-0 mr-3">
             <div className="min-w-0 text-right">
               <p className="text-sm font-semibold text-foreground truncate">
@@ -395,18 +395,18 @@ export const DashboardHeader = ({
           <div className="hidden sm:flex items-center gap-2 mr-3">
             <Button
               variant="outline"
-              className="shadow-sm hover:shadow-md transition-shadow duration-200 h-9 px-3"
+              size="icon"
+              className="shadow-sm hover:shadow-md transition-shadow duration-200 h-9 w-9"
               onClick={() => window.dispatchEvent(new CustomEvent("export-appointments"))}
             >
-              <Download className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Exportar Agenda</span>
+              <Download className="h-4 w-4" />
             </Button>
             <Button
-              className="shadow-md hover:shadow-lg transition-all duration-200 h-9 px-3"
+              size="icon"
+              className="shadow-md hover:shadow-lg transition-all duration-200 h-9 w-9"
               onClick={() => window.dispatchEvent(new CustomEvent("open-create-appointment"))}
             >
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Novo</span>
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
         )}

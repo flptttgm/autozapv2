@@ -161,6 +161,7 @@ const Leads = () => {
         .from("lead_folders" as any)
         .select("*")
         .eq("workspace_id", profile.workspace_id)
+        .order("sort_order")
         .order("name");
       if (error) throw error;
       return (data as unknown as LeadFolder[]) || [];
@@ -665,6 +666,34 @@ const Leads = () => {
               queryClient.invalidateQueries({ queryKey: ["leads-counts"] });
             } catch (err: any) {
               toast.error(err.message || t("folderDeleteError"));
+            }
+          }}
+          onReorderFolders={async (updates) => {
+            // Optimistic update
+            queryClient.setQueryData(
+              ["lead-folders", profile?.workspace_id],
+              (old: LeadFolder[] | undefined) => {
+                if (!old) return old;
+                const orderMap = new Map(updates.map((u) => [u.id, u.sort_order]));
+                return [...old].sort(
+                  (a, b) => (orderMap.get(a.id) ?? a.sort_order ?? 0) - (orderMap.get(b.id) ?? b.sort_order ?? 0)
+                );
+              }
+            );
+            // Persist to DB
+            try {
+              await Promise.all(
+                updates.map((u) =>
+                  supabase
+                    .from("lead_folders" as any)
+                    .update({ sort_order: u.sort_order } as any)
+                    .eq("id", u.id)
+                )
+              );
+            } catch (err: any) {
+              console.error("Failed to reorder folders:", err);
+              toast.error("Erro ao reordenar pastas");
+              queryClient.invalidateQueries({ queryKey: ["lead-folders"] });
             }
           }}
           totalLeadsCount={totalLeadsCount}

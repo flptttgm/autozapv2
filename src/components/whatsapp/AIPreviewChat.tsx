@@ -1,16 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { PlaybackWaveform } from "./PlaybackWaveform";
-import { 
-  Send, 
-  Trash2, 
-  Bot,
-  Sparkles,
+import {
+  Send,
+  Trash2,
   Clock,
   Calendar,
   HelpCircle,
@@ -48,12 +45,11 @@ const formatTime = (date: Date) => {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 };
 
-// Typing animation component
 const TypingIndicator = () => (
-  <div className="flex items-center gap-1 px-2 py-1">
-    <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-    <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-    <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+  <div className="flex items-center gap-1.5 px-2 py-1.5">
+    <span className="w-1.5 h-1.5 bg-purple-500/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <span className="w-1.5 h-1.5 bg-purple-500/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+    <span className="w-1.5 h-1.5 bg-purple-500/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
   </div>
 );
 
@@ -76,11 +72,11 @@ const AudioWaveform = ({ stream, duration }: { stream: MediaStream | null; durat
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaStreamSource(stream);
-    
+
     analyser.fftSize = 64;
     analyser.smoothingTimeConstant = 0.8;
     source.connect(analyser);
-    
+
     audioContextRef.current = audioContext;
     analyserRef.current = analyser;
 
@@ -94,23 +90,23 @@ const AudioWaveform = ({ stream, duration }: { stream: MediaStream | null; durat
 
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
-      
+
       analyser.getByteFrequencyData(dataArray);
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       const barWidth = canvas.width / barCount;
       const gap = 2;
-      
+
       for (let i = 0; i < barCount; i++) {
         const dataIndex = Math.floor(i * (bufferLength / barCount));
         const value = dataArray[dataIndex] || 0;
         const barHeight = Math.max(4, (value / 255) * canvas.height * 0.9);
-        
+
         const x = i * barWidth + gap / 2;
         const y = (canvas.height - barHeight) / 2;
-        
-        ctx.fillStyle = '#25D366';
+
+        ctx.fillStyle = '#a855f7';
         ctx.beginPath();
         ctx.roundRect(x, y, barWidth - gap, barHeight, 2);
         ctx.fill();
@@ -137,20 +133,20 @@ const AudioWaveform = ({ stream, duration }: { stream: MediaStream | null; durat
           {formatDuration(duration)}
         </span>
       </div>
-      <canvas 
-        ref={canvasRef} 
-        width={120} 
-        height={32} 
+      <canvas
+        ref={canvasRef}
+        width={120}
+        height={32}
         className="flex-1 max-w-[120px]"
       />
     </div>
   );
 };
 
-export const AIPreviewChat = ({ 
-  workspaceId, 
+export const AIPreviewChat = ({
+  workspaceId,
   templateId,
-  templateName 
+  templateName
 }: AIPreviewChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -164,7 +160,7 @@ export const AIPreviewChat = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -197,7 +193,7 @@ export const AIPreviewChat = ({
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/preview-ai-response`;
 
     setIsTyping(true);
-    
+
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -220,7 +216,7 @@ export const AIPreviewChat = ({
     if (!resp.body) throw new Error("No response body");
 
     setIsTyping(false);
-    
+
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let textBuffer = "";
@@ -253,7 +249,7 @@ export const AIPreviewChat = ({
             setMessages(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg?.role === "assistant") {
-                return prev.map((m, i) => 
+                return prev.map((m, i) =>
                   i === prev.length - 1 ? { ...m, content: assistantContent } : m
                 );
               }
@@ -305,58 +301,58 @@ export const AIPreviewChat = ({
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
-        } 
+        }
       });
-      
+
       // Store stream for waveform visualization
       audioStreamRef.current = stream;
       setAudioStream(stream);
-      
+
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
       });
-      
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-      
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
-      
+
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
         setAudioStream(null);
-        
+
         if (audioChunksRef.current.length === 0) {
           toast.error("Nenhum áudio gravado");
           return;
         }
-        
-        const audioBlob = new Blob(audioChunksRef.current, { 
-          type: mediaRecorder.mimeType 
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType
         });
-        
+
         // Store audio for playback instead of transcribing immediately
         const audioUrl = URL.createObjectURL(audioBlob);
         setRecordedAudio({ blob: audioBlob, url: audioUrl });
       };
-      
+
       mediaRecorder.start(1000);
       setIsRecording(true);
       setRecordingDuration(0);
-      
+
       recordingIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-      
+
     } catch (error) {
       console.error("Error starting recording:", error);
       toast.error("Erro ao acessar microfone. Verifique as permissões.");
@@ -367,19 +363,19 @@ export const AIPreviewChat = ({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
-    
+
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
-    
+
     setIsRecording(false);
     setRecordingDuration(0);
   }, []);
 
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
-    
+
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
@@ -389,10 +385,10 @@ export const AIPreviewChat = ({
         };
         reader.onerror = reject;
       });
-      
+
       reader.readAsDataURL(audioBlob);
       const audioBase64 = await base64Promise;
-      
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio-base64`,
         {
@@ -407,21 +403,21 @@ export const AIPreviewChat = ({
           }),
         }
       );
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Erro na transcrição");
       }
-      
+
       const data = await response.json();
-      
+
       if (data.transcription && data.transcription.trim()) {
         toast.success("Áudio transcrito!");
         await handleSend(data.transcription, true);
       } else {
         toast.error("Não foi possível transcrever o áudio");
       }
-      
+
     } catch (error) {
       console.error("Error transcribing audio:", error);
       toast.error(error instanceof Error ? error.message : "Erro ao transcrever áudio");
@@ -464,7 +460,7 @@ export const AIPreviewChat = ({
 
   const handlePlayPauseAudio = () => {
     if (!audioRef.current) return;
-    
+
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -499,80 +495,56 @@ export const AIPreviewChat = ({
   };
 
   return (
-    <div className="flex flex-col h-[480px] sm:h-[450px]">
-      {/* WhatsApp-style Header */}
-      <div className="flex items-center gap-2 p-3 bg-[#075E54] dark:bg-card rounded-t-lg -mx-1 -mt-1">
-        {/* Left side - flex-1 min-w-0 allows shrinking */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#25D366] rounded-full border-2 border-[#075E54] dark:border-card" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium text-white truncate">
-              {templateName}
-            </span>
-            <span className="text-xs text-white/70 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-[#25D366] rounded-full" />
-              online
-            </span>
-          </div>
-        </div>
-        {/* Right side - flex-shrink-0 keeps fixed size */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className="text-[10px] bg-white/10 text-white border-white/20 hidden sm:flex">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Preview
-          </Badge>
-          {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="h-7 text-xs gap-1 text-white/70 hover:text-white hover:bg-white/10"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span className="hidden sm:inline">Limpar</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* WhatsApp-style Chat Area */}
-      <ScrollArea 
-        className="flex-1 bg-muted/50 dark:bg-muted p-3 overflow-y-auto"
+    <div className="flex flex-col h-full">
+      {/* Chat Area */}
+      <ScrollArea
+        className="flex-1 p-4 overflow-y-auto"
       >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-4">
-            <div className="w-16 h-16 rounded-full bg-[#25D366]/20 flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-[#25D366]" />
+          <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-violet-500/20 flex items-center justify-center mb-5 shadow-lg shadow-purple-500/5">
+              <MessageCircle className="w-7 h-7 text-purple-500" />
             </div>
-            <p className="text-sm font-medium text-foreground/80 mb-1">
+            <p className="text-base font-semibold text-foreground mb-1.5">
               Teste como a IA responderá
             </p>
-            <p className="text-xs text-muted-foreground max-w-[200px] mb-2">
+            <p className="text-sm text-muted-foreground max-w-[260px] leading-relaxed">
               Simule uma conversa real. As mensagens não são enviadas pelo WhatsApp.
             </p>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground/70">
-              <Mic className="w-3 h-3" />
+            <div className="flex items-center gap-1.5 mt-4 text-xs text-muted-foreground/60">
+              <Mic className="w-3.5 h-3.5" />
               <span>Teste também com áudio</span>
+            </div>
+
+            {/* Example Messages */}
+            <div className="grid grid-cols-2 gap-2 mt-8 w-full max-w-xs">
+              {EXAMPLE_MESSAGES.map((ex) => (
+                <button
+                  key={ex.label}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/50 border border-border/50 hover:border-purple-500/30 hover:bg-purple-500/5 transition-all duration-200 hover:shadow-sm active:scale-[0.97] disabled:opacity-50 group"
+                  onClick={() => handleSend(ex.message)}
+                  disabled={isLoading}
+                >
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 group-hover:bg-purple-500/15 transition-colors">
+                    <ex.icon className="w-3.5 h-3.5 text-purple-500" />
+                  </div>
+                  <span className="text-xs font-medium text-foreground/80 text-left">{ex.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {messages.map((msg, idx) => (
               <div
                 key={idx}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
               >
                 <div
-                  className={`relative max-w-[85%] sm:max-w-[75%] rounded-lg px-3 py-2 shadow-sm ${
-                    msg.role === "user"
-                      ? "bg-[#DCF8C6] dark:bg-primary/20 text-foreground rounded-tr-none"
-                      : "bg-white dark:bg-card text-foreground rounded-tl-none"
-                  }`}
+                  className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm ${msg.role === "user"
+                    ? "bg-purple-500/15 text-foreground rounded-tr-sm"
+                    : "bg-muted/60 border border-border/40 text-foreground rounded-tl-sm"
+                    }`}
                 >
                   {/* Audio indicator */}
                   {msg.isAudio && msg.role === "user" && (
@@ -581,7 +553,7 @@ export const AIPreviewChat = ({
                       <span>Áudio transcrito</span>
                     </div>
                   )}
-                  
+
                   {/* Message content with markdown support */}
                   <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-strong:text-inherit">
                     <ReactMarkdown
@@ -602,14 +574,13 @@ export const AIPreviewChat = ({
                       {msg.content}
                     </ReactMarkdown>
                   </div>
-                  
+
                   {/* Timestamp */}
-                  <div className={`flex items-center justify-end gap-1 mt-1 ${
-                    msg.role === "user" ? "text-[#667781]" : "text-muted-foreground"
-                  }`}>
-                    <span className="text-[10px]">{formatTime(msg.timestamp)}</span>
+                  <div className={`flex items-center justify-end gap-1 mt-1 ${msg.role === "user" ? "text-purple-500/50" : "text-muted-foreground/50"
+                    }`}>
+                    <span className="text-[10px] tabular-nums">{formatTime(msg.timestamp)}</span>
                     {msg.role === "user" && (
-                      <svg viewBox="0 0 16 11" width="16" height="11" className="text-[#53bdeb]">
+                      <svg viewBox="0 0 16 11" width="14" height="9" className="text-purple-500/60">
                         <path fill="currentColor" d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.405-2.272a.463.463 0 0 0-.336-.146.47.47 0 0 0-.343.146l-.311.31a.445.445 0 0 0-.14.337c0 .136.047.25.14.343l2.996 2.996a.724.724 0 0 0 .501.203.697.697 0 0 0 .546-.266l6.646-8.417a.497.497 0 0 0 .108-.299.441.441 0 0 0-.19-.374l-.337-.273zm3.634 0a.457.457 0 0 0-.303-.102.493.493 0 0 0-.382.178l-6.19 7.636-1.152-1.089-.337.274 1.768 1.768a.724.724 0 0 0 .501.203.697.697 0 0 0 .546-.266l6.646-8.417a.497.497 0 0 0 .108-.299.441.441 0 0 0-.19-.374l-.337-.273z" />
                       </svg>
                     )}
@@ -617,45 +588,39 @@ export const AIPreviewChat = ({
                 </div>
               </div>
             ))}
-            
+
             {/* Typing indicator */}
             {isTyping && (
               <div className="flex justify-start animate-fade-in">
-                <div className="bg-white dark:bg-card rounded-lg rounded-tl-none px-3 py-2 shadow-sm">
+                <div className="bg-muted/60 border border-border/40 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-sm">
                   <TypingIndicator />
                 </div>
               </div>
             )}
-            
+
             {/* Scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
         )}
       </ScrollArea>
 
-      {/* Example Messages - More visual cards */}
-      {messages.length === 0 && (
-        <div className="bg-[#ECE5DD] dark:bg-muted px-3 pb-2">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {EXAMPLE_MESSAGES.map((ex) => (
-              <button
-                key={ex.label}
-                className="flex flex-col items-center gap-1.5 p-2 rounded-lg bg-white dark:bg-card shadow-sm hover:shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                onClick={() => handleSend(ex.message)}
-                disabled={isLoading}
-              >
-                <div className="w-8 h-8 rounded-full bg-[#25D366]/10 flex items-center justify-center">
-                  <ex.icon className="w-4 h-4 text-[#25D366]" />
-                </div>
-                <span className="text-xs font-medium text-foreground/80">{ex.label}</span>
-              </button>
-            ))}
-          </div>
+      {/* Clear button */}
+      {messages.length > 0 && (
+        <div className="flex justify-center py-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClear}
+            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <Trash2 className="w-3 h-3" />
+            Limpar conversa
+          </Button>
         </div>
       )}
 
-      {/* WhatsApp-style Input */}
-      <div className="flex items-center gap-2 p-3 bg-[#F0F2F5] dark:bg-card rounded-b-lg -mx-1 -mb-1 min-w-0 overflow-hidden">
+      {/* Input Area */}
+      <div className="flex items-center gap-2 p-3 border-t border-border/50 min-w-0 overflow-hidden">
         {isRecording ? (
           <>
             <div className="flex-1 min-w-0 overflow-hidden">
@@ -673,9 +638,9 @@ export const AIPreviewChat = ({
         ) : recordedAudio ? (
           <>
             {/* Audio playback UI with progress */}
-            <audio 
-              ref={audioRef} 
-              src={recordedAudio.url} 
+            <audio
+              ref={audioRef}
+              src={recordedAudio.url}
               className="hidden"
               onTimeUpdate={handleAudioTimeUpdate}
               onLoadedMetadata={handleAudioLoadedMetadata}
@@ -696,14 +661,14 @@ export const AIPreviewChat = ({
                 onClick={handlePlayPauseAudio}
                 size="icon"
                 variant="ghost"
-                className="h-6 w-6 sm:h-7 sm:w-7 rounded-full shrink-0 text-[#25D366] hover:text-[#128C7E] hover:bg-[#25D366]/10"
+                className="h-6 w-6 sm:h-7 sm:w-7 rounded-full shrink-0 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10"
               >
                 {isPlaying ? <Pause className="w-3 h-3 sm:w-4 sm:h-4" /> : <Play className="w-3 h-3 sm:w-4 sm:h-4" />}
               </Button>
               <div className="flex-1 min-w-0 overflow-hidden">
-                <PlaybackWaveform 
-                  isPlaying={isPlaying} 
-                  progress={playbackProgress} 
+                <PlaybackWaveform
+                  isPlaying={isPlaying}
+                  progress={playbackProgress}
                   className="w-full"
                 />
               </div>
@@ -715,7 +680,7 @@ export const AIPreviewChat = ({
               onClick={handleSendAudio}
               disabled={isTranscribing}
               size="icon"
-              className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
+              className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-500 hover:bg-purple-600 text-white shrink-0"
             >
               {isTranscribing ? (
                 <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
@@ -726,7 +691,7 @@ export const AIPreviewChat = ({
           </>
         ) : isTranscribing ? (
           <div className="flex-1 flex items-center justify-center gap-2 h-10">
-            <Loader2 className="w-5 h-5 animate-spin text-[#25D366]" />
+            <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
             <span className="text-sm text-muted-foreground">Transcrevendo áudio...</span>
           </div>
         ) : (
@@ -742,16 +707,16 @@ export const AIPreviewChat = ({
                 }
               }}
               placeholder="Digite uma mensagem..."
-              className="flex-1 h-10 text-sm bg-white dark:bg-muted border-0 rounded-full px-4 focus-visible:ring-1 focus-visible:ring-[#25D366]"
+              className="flex-1 h-12 text-sm bg-muted/50 border-border/50 rounded-full px-5 focus-visible:ring-1 focus-visible:ring-purple-500/50"
               disabled={isLoading}
             />
-            
+
             {input.trim() ? (
               <Button
                 onClick={() => handleSend()}
                 disabled={isLoading}
                 size="icon"
-                className="h-10 w-10 rounded-full bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
+                className="h-10 w-10 rounded-full bg-purple-500 hover:bg-purple-600 text-white shrink-0"
               >
                 <Send className="w-5 h-5" />
               </Button>
@@ -760,7 +725,7 @@ export const AIPreviewChat = ({
                 onClick={handleMicClick}
                 disabled={isLoading}
                 size="icon"
-                className="h-10 w-10 rounded-full bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
+                className="h-10 w-10 rounded-full bg-purple-500 hover:bg-purple-600 text-white shrink-0"
               >
                 <Mic className="w-5 h-5" />
               </Button>

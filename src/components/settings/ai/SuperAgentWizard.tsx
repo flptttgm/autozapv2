@@ -10,12 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import {
     Bot, User, Heart, Star, Zap, Sparkles, Shield, Target,
     Award, Crown, Lightbulb, Rocket, Coffee, MessageCircle,
     Loader2, ChevronRight, ChevronLeft, Check, ArrowLeft,
     Wrench, Brain, Calendar, Search, UserCheck, Info,
-    HelpCircle, Wand2, Eye,
+    HelpCircle, Wand2, Eye, BookOpen, StickyNote, PhoneForwarded,
+    FileText, Lock, Package, CalendarX, History, Truck,
+    CreditCard, FolderInput, ClipboardList, MessageSquare,
+    Smile, Mic, Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,16 +47,38 @@ const iconOptions = [
 
 const getIconComponent = (id: string) => iconOptions.find((o) => o.id === id)?.icon || Bot;
 
-// ─── Available Tools ───
-const availableTools = [
+// ─── Core Tools (always active for all agents) ───
+const coreTools = [
+    { id: "get_lead_info", label: "Info do Cliente", icon: UserCheck, description: "Busca dados cadastrais do cliente" },
+    { id: "create_update_lead", label: "Criar/Atualizar Lead", icon: User, description: "Captura e atualiza dados do cliente automaticamente" },
+    { id: "transfer_to_human", label: "Transferir p/ Humano", icon: PhoneForwarded, description: "Escala a conversa para atendimento humano" },
+    { id: "search_knowledge_base", label: "Buscar Conhecimento", icon: BookOpen, description: "Consulta a base de conhecimento para respostas precisas" },
+    { id: "register_note", label: "Registrar Nota", icon: StickyNote, description: "Adiciona observações e notas ao perfil do cliente" },
+];
+
+const coreToolIds = coreTools.map(t => t.id);
+
+// ─── Optional Tools (toggleable per agent) ───
+const optionalTools = [
+    // 🔥 Alto impacto
     { id: "check_appointments", label: "Consultar Agendamentos", icon: Calendar, description: "Busca os agendamentos existentes do cliente" },
     { id: "check_availability", label: "Verificar Disponibilidade", icon: Search, description: "Consulta horários livres para novos agendamentos" },
     { id: "schedule_appointment", label: "Agendar", icon: Calendar, description: "Cria um novo agendamento para o cliente" },
-    { id: "get_lead_info", label: "Info do Cliente", icon: UserCheck, description: "Busca dados cadastrais do cliente" },
+    { id: "cancel_reschedule", label: "Cancelar/Reagendar", icon: CalendarX, description: "Cancela ou move um agendamento existente" },
+    { id: "send_quote", label: "Enviar Orçamento", icon: FileText, description: "Gera e envia um orçamento com base nos serviços discutidos" },
+    { id: "query_products", label: "Consultar Produtos", icon: Package, description: "Busca no catálogo (preço, disponibilidade, descrição)" },
+    // 💡 Médio impacto
+    { id: "check_conversation_history", label: "Histórico de Conversas", icon: History, description: "Busca conversas anteriores do cliente para contexto" },
+    { id: "check_order_status", label: "Status de Pedido", icon: Package, description: "Consulta status de pedidos para e-commerce/delivery" },
+    { id: "send_payment_link", label: "Link de Pagamento", icon: CreditCard, description: "Gera um link de pagamento (PIX, Stripe, etc.)" },
+    { id: "calculate_shipping", label: "Calcular Frete", icon: Truck, description: "Calcula frete e prazo de entrega" },
+    // 🚀 Avançado
+    { id: "summarize_conversation", label: "Resumir Conversa", icon: MessageSquare, description: "Gera um resumo da conversa para handoff humano" },
+    { id: "create_followup_task", label: "Tarefa de Follow-up", icon: ClipboardList, description: "Agenda um lembrete para recontatar o cliente" },
 ];
 
 // ─── Types ───
-type WizardStep = "type" | "identity" | "brain" | "apply";
+type WizardStep = "type" | "identity" | "brain" | "tools" | "apply";
 
 interface SuperAgentWizardProps {
     workspaceId: string;
@@ -64,7 +90,8 @@ interface SuperAgentWizardProps {
 const steps: { key: WizardStep; label: string; icon: React.ElementType; description: string }[] = [
     { key: "type", label: "Tipo", icon: Sparkles, description: "Escolha o perfil do agente" },
     { key: "identity", label: "Identidade", icon: User, description: "Nome e personalidade" },
-    { key: "brain", label: "Cérebro", icon: Brain, description: "Prompt e ferramentas" },
+    { key: "brain", label: "Cérebro", icon: Brain, description: "Prompt e comportamento" },
+    { key: "tools", label: "Ferramentas", icon: Wrench, description: "Habilidades do agente" },
     { key: "apply", label: "Ativar", icon: Zap, description: "Vincular às instâncias" },
 ];
 
@@ -89,9 +116,13 @@ export const SuperAgentWizard = ({
 
     // ─── Brain State ───
     const [systemPrompt, setSystemPrompt] = useState("");
-    const [personality, setPersonality] = useState({ tone: 50, use_emojis: true });
+    const [personality, setPersonality] = useState({
+        tone: 50, use_emojis: true, verbosity: 50, proactivity: 70,
+        language: "pt-BR", response_speed: "simulated",
+        use_slang: false, formal_names: false, use_audio: false,
+    });
     const [enabledTools, setEnabledTools] = useState<string[]>([
-        "check_appointments", "check_availability", "schedule_appointment", "get_lead_info",
+        "check_appointments", "check_availability", "schedule_appointment", "send_quote",
     ]);
     const [triggerKeywords, setTriggerKeywords] = useState<string[]>([]);
     const [keywordInput, setKeywordInput] = useState("");
@@ -122,7 +153,12 @@ export const SuperAgentWizard = ({
             setAgentType(editAgent.agent_type || "custom");
             setSelectedIcon(editAgent.icon || "bot");
             setSystemPrompt(editAgent.system_prompt || "");
-            setPersonality(editAgent.personality || { tone: 50, use_emojis: true });
+            setPersonality({
+                tone: 50, use_emojis: true, verbosity: 50, proactivity: 70,
+                language: "pt-BR", response_speed: "simulated",
+                use_slang: false, formal_names: false, use_audio: false,
+                ...(editAgent.personality || {}),
+            });
             setEnabledTools(editAgent.enabled_tools || []);
             setTriggerKeywords(editAgent.trigger_keywords || []);
             const linkedIds = (instances || []).filter((i: any) => i.super_agent_id === editAgent.id).map((i: any) => i.id);
@@ -137,7 +173,13 @@ export const SuperAgentWizard = ({
             const profile = AGENT_PROFILES[type];
             setAgentName(profile.name);
             setSelectedIcon(profile.iconId || "bot");
-            setPersonality({ tone: profile.personality.tone, use_emojis: profile.personality.use_emojis });
+            setPersonality((prev) => ({
+                ...prev,
+                tone: profile.personality.tone,
+                use_emojis: profile.personality.use_emojis,
+                verbosity: profile.personality.verbosity ?? 50,
+                proactivity: profile.personality.proactivity ?? 70,
+            }));
             setSystemPrompt(profile.system_prompt);
             setTriggerKeywords(profile.trigger_keywords);
             if (profile.suggested_personas.length > 0) {
@@ -182,7 +224,7 @@ export const SuperAgentWizard = ({
                 system_prompt: systemPrompt,
                 personality,
                 behavior: { business_goal: businessGoal },
-                enabled_tools: enabledTools,
+                enabled_tools: [...coreToolIds, ...enabledTools.filter(t => !coreToolIds.includes(t))],
                 trigger_keywords: triggerKeywords,
                 is_active: true,
             };
@@ -245,6 +287,8 @@ export const SuperAgentWizard = ({
     const back = () => { if (stepIndex > 0) setCurrentStep(steps[stepIndex - 1].key); };
 
     const toneLabel = personality.tone < 30 ? "Formal" : personality.tone > 70 ? "Descontraído" : "Equilibrado";
+    const verbosityLabel = personality.verbosity < 30 ? "Curto" : personality.verbosity > 70 ? "Detalhado" : "Moderado";
+    const proactivityLabel = personality.proactivity < 30 ? "Reativo" : personality.proactivity > 70 ? "Proativo" : "Equilibrado";
     const SelectedIconComp = getIconComponent(selectedIcon);
 
     return (
@@ -271,16 +315,18 @@ export const SuperAgentWizard = ({
                     const StepIcon = step.icon;
                     const isActive = i === stepIndex;
                     const isComplete = i < stepIndex;
+                    const isNavigable = isEditMode ? !isActive : isComplete;
                     return (
                         <div key={step.key} className="flex items-center gap-1 flex-1">
                             <button
-                                onClick={() => isComplete && setCurrentStep(step.key)}
-                                disabled={!isComplete}
+                                onClick={() => isNavigable && setCurrentStep(step.key)}
+                                disabled={!isNavigable}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all w-full justify-center",
+                                    "flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-all w-full justify-center",
                                     isActive && "bg-primary text-primary-foreground shadow-md shadow-primary/25",
-                                    isComplete && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
-                                    !isActive && !isComplete && "bg-muted/50 text-muted-foreground"
+                                    isComplete && !isActive && "bg-primary/15 text-primary cursor-pointer hover:bg-primary/25",
+                                    !isActive && !isComplete && isNavigable && "bg-muted/80 text-foreground/70 cursor-pointer hover:bg-muted",
+                                    !isActive && !isComplete && !isNavigable && "bg-muted/50 text-muted-foreground"
                                 )}
                             >
                                 {isComplete ? <Check className="h-3.5 w-3.5" /> : <StepIcon className="h-3.5 w-3.5" />}
@@ -372,54 +418,73 @@ export const SuperAgentWizard = ({
             {currentStep === "identity" && (
                 <div className="space-y-5 animate-in fade-in duration-200">
 
-                    {/* Tip */}
-                    <Card className="p-4 bg-gradient-to-r from-blue-500/5 via-sky-500/5 to-cyan-500/5 border-blue-500/20">
-                        <div className="flex gap-3">
-                            <div className="p-2 rounded-lg bg-blue-500/10 shrink-0 h-fit">
-                                <HelpCircle className="h-5 w-5 text-blue-500" />
+                    {/* Live Agent Preview Card */}
+                    <Card className="p-0 overflow-hidden border-0 shadow-xl">
+                        <div className="relative bg-gradient-to-br from-gray-100 via-slate-200 to-gray-100 dark:from-slate-800 dark:via-slate-700 dark:to-zinc-800 p-6">
+                            {/* Subtle glow */}
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(0,0,0,0.02),transparent_60%)] dark:bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.04),transparent_60%)]" />
+
+                            <div className="relative flex items-start gap-5">
+                                {/* Icon picker — always shows edit hint */}
+                                <button
+                                    onClick={() => setShowIconPicker(!showIconPicker)}
+                                    className="relative group shrink-0"
+                                >
+                                    <div className={cn(
+                                        "w-[72px] h-[72px] rounded-2xl flex items-center justify-center transition-all border-2",
+                                        "bg-slate-500/10 dark:bg-white/10 backdrop-blur-md border-slate-300 dark:border-white/20 group-hover:border-slate-400 dark:group-hover:border-white/50 group-hover:scale-105 shadow-lg shadow-black/5 dark:shadow-black/10"
+                                    )}>
+                                        <SelectedIconComp className="h-9 w-9 text-slate-700 dark:text-white" />
+                                    </div>
+                                    <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-white dark:bg-white shadow-md flex items-center justify-center transition-transform group-hover:scale-110">
+                                        <Wand2 className="h-3 w-3 text-slate-600 dark:text-violet-600" />
+                                    </div>
+                                </button>
+
+                                {/* Agent info */}
+                                <div className="flex-1 min-w-0 pt-0.5">
+                                    <h3 className="text-slate-800 dark:text-white font-bold text-xl leading-tight truncate">
+                                        {agentName || "Nome do Agente"}
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                        {personaName ? (
+                                            <span className="text-xs bg-slate-500/10 dark:bg-white/15 text-slate-600 dark:text-white/90 px-2.5 py-0.5 rounded-full backdrop-blur-sm">
+                                                {personaName}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400 dark:text-white/50 italic">Sem persona</span>
+                                        )}
+                                        <span className="text-xs text-slate-300 dark:text-white/40">•</span>
+                                        <span className="text-xs text-slate-500 dark:text-white/50">{toneLabel}</span>
+                                    </div>
+                                    {businessGoal && (
+                                        <p className="text-slate-400 dark:text-white/50 text-xs mt-2 flex items-center gap-1.5 truncate">
+                                            <Target className="h-3 w-3 shrink-0" />
+                                            {businessGoal}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-medium">Dê uma identidade ao seu agente</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    O <strong>nome do agente</strong> é como ele aparece pra você na plataforma.
-                                    A <strong>persona</strong> é o personagem que o cliente vai interagir — tipo
-                                    "Mariana da equipe de Vendas". Isso humaniza a conversa!
-                                </p>
+                        </div>
+                        <div className="px-5 py-2 bg-muted/40 border-t border-border/30 flex items-center justify-between">
+                            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                <Eye className="h-3 w-3" />
+                                Preview em tempo real
+                            </p>
+                            <div className="flex items-center gap-2">
+                                {personality.use_emojis && <span className="text-[10px] text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full">Emojis</span>}
+                                {personality.use_audio && <span className="text-[10px] text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full">Áudio</span>}
+                                <span className="text-[10px] text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full">
+                                    {personality.language === "auto" ? "Multi-idioma" : personality.language === "pt-BR" ? "PT-BR" : personality.language === "es" ? "ES" : "EN"}
+                                </span>
                             </div>
                         </div>
                     </Card>
 
-                    {/* Icon + Agent Name row */}
-                    <div className="flex gap-3 items-start">
-                        {/* Icon picker */}
-                        <div className="shrink-0">
-                            <Label className="text-xs text-muted-foreground mb-1.5 block">Ícone</Label>
-                            <button
-                                onClick={() => setShowIconPicker(!showIconPicker)}
-                                className={cn(
-                                    "w-14 h-14 rounded-xl flex items-center justify-center transition-all border-2",
-                                    "bg-primary/10 text-primary border-primary/20 hover:border-primary/40 hover:shadow-md"
-                                )}
-                            >
-                                <SelectedIconComp className="h-7 w-7" />
-                            </button>
-                        </div>
-
-                        {/* Agent name */}
-                        <div className="flex-1 space-y-1.5">
-                            <Label className="text-sm">Nome do Agente *</Label>
-                            <Input
-                                value={agentName}
-                                onChange={(e) => setAgentName(e.target.value)}
-                                placeholder="Ex: Vendedor Principal, Atendente VIP..."
-                                className="h-11"
-                            />
-                        </div>
-                    </div>
-
                     {/* Icon grid (expandable) */}
                     {showIconPicker && (
                         <Card className="p-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <p className="text-xs text-muted-foreground mb-2">Escolha um ícone para o agente</p>
                             <div className="grid grid-cols-8 gap-1.5">
                                 {iconOptions.map((opt) => {
                                     const Ic = opt.icon;
@@ -428,8 +493,8 @@ export const SuperAgentWizard = ({
                                             key={opt.id}
                                             onClick={() => { setSelectedIcon(opt.id); setShowIconPicker(false); }}
                                             className={cn(
-                                                "p-2 rounded-lg transition-all hover:bg-primary/10",
-                                                selectedIcon === opt.id && "bg-primary/20 ring-2 ring-primary"
+                                                "p-2.5 rounded-xl transition-all hover:bg-primary/10 hover:scale-105",
+                                                selectedIcon === opt.id && "bg-primary/20 ring-2 ring-primary shadow-sm"
                                             )}
                                         >
                                             <Ic className="h-5 w-5 mx-auto" />
@@ -440,65 +505,253 @@ export const SuperAgentWizard = ({
                         </Card>
                     )}
 
-                    {/* Persona Name */}
-                    <div className="space-y-1.5">
-                        <Label className="text-sm flex items-center gap-2">
-                            Persona (nome fictício)
-                            <Badge variant="outline" className="text-[10px] font-normal">Recomendado</Badge>
-                        </Label>
-                        <Input
-                            value={personaName}
-                            onChange={(e) => setPersonaName(e.target.value)}
-                            placeholder="Ex: Mariana, Carlos, Sofia..."
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            O agente se apresentará com esse nome para o cliente. Deixe vazio se preferir sem persona.
-                        </p>
+                    {/* Agent Name + Persona in 2 columns */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium flex items-center gap-1.5">
+                                <Bot className="h-3.5 w-3.5 text-primary" />
+                                Nome do Agente *
+                            </Label>
+                            <Input
+                                value={agentName}
+                                onChange={(e) => setAgentName(e.target.value)}
+                                placeholder="Ex: Vendedor Principal..."
+                                className="h-11"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                Visível só pra você na plataforma
+                            </p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5 text-violet-500" />
+                                Persona
+                                <Badge variant="outline" className="text-[10px] font-normal ml-1">Recomendado</Badge>
+                            </Label>
+                            <Input
+                                value={personaName}
+                                onChange={(e) => setPersonaName(e.target.value)}
+                                placeholder="Ex: Mariana, Carlos..."
+                                className="h-11"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                O cliente conversa com esse nome
+                            </p>
+                        </div>
                     </div>
 
                     {/* Business goal */}
-                    <div className="space-y-1.5">
-                        <Label className="text-sm">Objetivo principal</Label>
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-1.5">
+                            <Target className="h-3.5 w-3.5 text-amber-500" />
+                            Objetivo principal
+                        </Label>
                         <Input
                             value={businessGoal}
                             onChange={(e) => setBusinessGoal(e.target.value)}
-                            placeholder="Ex: Vender planos odontológicos, Agendar consultas..."
+                            placeholder="Ex: Vender planos odontológicos, Agendar consultas, Suporte técnico..."
+                            className="h-11"
                         />
+                        {/* Goal suggestions based on agent type */}
+                        {(() => {
+                            const goalSuggestions: Record<string, string[]> = {
+                                sales: [
+                                    "Vender planos e serviços",
+                                    "Converter leads em clientes",
+                                    "Apresentar produtos e preços",
+                                    "Negociar e fechar vendas",
+                                ],
+                                support: [
+                                    "Resolver dúvidas dos clientes",
+                                    "Atendimento ao cliente",
+                                    "Orientar sobre serviços",
+                                    "Resolver reclamações",
+                                ],
+                                scheduling: [
+                                    "Agendar consultas",
+                                    "Gerenciar agendamentos",
+                                    "Remarcar e cancelar horários",
+                                    "Confirmar agendamentos",
+                                ],
+                                financial: [
+                                    "Enviar boletos e faturas",
+                                    "Tirar dúvidas sobre pagamentos",
+                                    "Negociar débitos",
+                                    "Orientar formas de pagamento",
+                                ],
+                                technical: [
+                                    "Resolver problemas técnicos",
+                                    "Orientar configurações",
+                                    "Suporte técnico passo a passo",
+                                    "Diagnosticar e corrigir erros",
+                                ],
+                                general: [
+                                    "Atendimento geral ao cliente",
+                                    "Responder dúvidas frequentes",
+                                    "Direcionar para o setor correto",
+                                    "Coletar informações do cliente",
+                                ],
+                                custom: [
+                                    "Atendimento personalizado",
+                                    "Vender produtos e serviços",
+                                    "Agendar horários",
+                                    "Suporte ao cliente",
+                                ],
+                            };
+                            const suggestions = goalSuggestions[agentType] || goalSuggestions.custom;
+                            return (
+                                <div className="flex flex-wrap gap-1.5">
+                                    <span className="text-[11px] text-muted-foreground mr-0.5 self-center">Sugestões:</span>
+                                    {suggestions.map((s) => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => setBusinessGoal(s)}
+                                            className={cn(
+                                                "text-[11px] px-2.5 py-1 rounded-full border transition-all",
+                                                businessGoal === s
+                                                    ? "bg-primary/10 border-primary/30 text-primary font-medium"
+                                                    : "border-border hover:border-primary/30 hover:bg-primary/5 text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
 
-                    {/* Personality quick settings */}
-                    <Card className="p-4 space-y-4">
-                        <h4 className="text-sm font-semibold flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            Personalidade
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">
-                                    Tom de voz: <span className="font-medium text-foreground">{toneLabel}</span>
-                                </Label>
-                                <Slider
-                                    value={[personality.tone]}
-                                    onValueChange={([v]) => setPersonality((p) => ({ ...p, tone: v }))}
-                                    min={0} max={100} step={10}
-                                />
-                                <div className="flex justify-between text-[10px] text-muted-foreground">
-                                    <span>Formal</span>
-                                    <span>Descontraído</span>
-                                </div>
+                    {/* Personality settings */}
+                    <div className="space-y-4">
+                        {/* Section header */}
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                                <Sparkles className="h-4 w-4 text-violet-400" />
                             </div>
-                            <div className="flex items-center gap-3 sm:pt-4">
-                                <Switch
-                                    checked={personality.use_emojis}
-                                    onCheckedChange={(v) => setPersonality((p) => ({ ...p, use_emojis: v }))}
-                                />
-                                <div>
-                                    <Label className="text-sm">Usar emojis</Label>
-                                    <p className="text-xs text-muted-foreground">Torna a conversa mais leve 😊</p>
-                                </div>
+                            <div>
+                                <h4 className="text-sm font-semibold">Personalidade</h4>
+                                <p className="text-[11px] text-muted-foreground">Como o agente se comporta nas conversas</p>
                             </div>
                         </div>
-                    </Card>
+
+                        {/* Sliders — 3 columns side by side */}
+                        <div className="grid grid-cols-3 gap-3">
+                            {/* Tone slider */}
+                            <Card className="p-3 border-t-[3px] border-t-violet-500/60">
+                                <div className="space-y-3">
+                                    <div className="text-center">
+                                        <Label className="text-[11px] text-muted-foreground">Tom de voz</Label>
+                                        <p className="text-xs font-semibold text-violet-400 mt-0.5">{toneLabel}</p>
+                                    </div>
+                                    <Slider value={[personality.tone]} onValueChange={([v]) => setPersonality((p) => ({ ...p, tone: v }))} min={0} max={100} step={10} />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                                        <span>Formal</span>
+                                        <span>Descontraído</span>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Verbosity slider */}
+                            <Card className="p-3 border-t-[3px] border-t-blue-500/60">
+                                <div className="space-y-3">
+                                    <div className="text-center">
+                                        <Label className="text-[11px] text-muted-foreground">Respostas</Label>
+                                        <p className="text-xs font-semibold text-blue-400 mt-0.5">{verbosityLabel}</p>
+                                    </div>
+                                    <Slider value={[personality.verbosity]} onValueChange={([v]) => setPersonality((p) => ({ ...p, verbosity: v }))} min={0} max={100} step={10} />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                                        <span>Curtas</span>
+                                        <span>Detalhadas</span>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Proactivity slider */}
+                            <Card className="p-3 border-t-[3px] border-t-amber-500/60">
+                                <div className="space-y-3">
+                                    <div className="text-center">
+                                        <Label className="text-[11px] text-muted-foreground">Proatividade</Label>
+                                        <p className="text-xs font-semibold text-amber-400 mt-0.5">{proactivityLabel}</p>
+                                    </div>
+                                    <Slider value={[personality.proactivity]} onValueChange={([v]) => setPersonality((p) => ({ ...p, proactivity: v }))} min={0} max={100} step={10} />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                                        <span>Reativo</span>
+                                        <span>Proativo</span>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+
+                        {/* Selects — side by side in mini-cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <Card className="p-4 space-y-2.5">
+                                <Label className="text-xs font-medium flex items-center gap-1.5">
+                                    <Globe className="h-4 w-4 text-blue-400" />
+                                    Idioma
+                                </Label>
+                                <Select value={personality.language} onValueChange={(v) => setPersonality((p) => ({ ...p, language: v }))}>
+                                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="auto">🌐 Multi-idiomas (detecta)</SelectItem>
+                                        <SelectItem value="pt-BR">🇧🇷 Português</SelectItem>
+                                        <SelectItem value="es">🇪🇸 Espanhol</SelectItem>
+                                        <SelectItem value="en">🇺🇸 Inglês</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </Card>
+                            <Card className="p-4 space-y-2.5">
+                                <Label className="text-xs font-medium flex items-center gap-1.5">
+                                    <Zap className="h-4 w-4 text-amber-400" />
+                                    Velocidade de resposta
+                                </Label>
+                                <Select value={personality.response_speed} onValueChange={(v) => setPersonality((p) => ({ ...p, response_speed: v }))}>
+                                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="instant">⚡ Instantânea</SelectItem>
+                                        <SelectItem value="simulated">⌨️ Simula digitação</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </Card>
+                        </div>
+
+                        {/* Switches — each in its own mini-card row */}
+                        <div className="space-y-2">
+                            {[
+                                { key: "use_emojis" as const, icon: Smile, label: "Usar emojis", desc: "Torna a conversa mais leve e humana", color: "text-amber-400" },
+                                { key: "use_slang" as const, icon: MessageCircle, label: "Gírias e regionalismos", desc: "\"Beleza\", \"top\", \"show de bola\"", color: "text-blue-400" },
+                                { key: "formal_names" as const, icon: UserCheck, label: "Tratamento formal", desc: "Usar \"Sr./Sra.\" ao invés do primeiro nome", color: "text-violet-400" },
+                                { key: "use_audio" as const, icon: Mic, label: "Enviar áudios", desc: "Permite responder com mensagens de voz", color: "text-emerald-400" },
+                            ].map((item) => (
+                                <Card
+                                    key={item.key}
+                                    className={cn(
+                                        "p-3.5 flex items-center justify-between cursor-pointer transition-all hover:shadow-sm",
+                                        (personality as any)[item.key] && "border-primary/30 bg-primary/[0.03]"
+                                    )}
+                                    onClick={() => setPersonality((p: any) => ({ ...p, [item.key]: !p[item.key] }))}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                                            (personality as any)[item.key] ? "bg-primary/10" : "bg-muted/50"
+                                        )}>
+                                            <item.icon className={cn("h-4.5 w-4.5", item.color)} />
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium cursor-pointer">{item.label}</Label>
+                                            <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={(personality as any)[item.key]}
+                                        onCheckedChange={(v) => setPersonality((p: any) => ({ ...p, [item.key]: v }))}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -544,48 +797,6 @@ export const SuperAgentWizard = ({
                         </div>
                     </div>
 
-                    {/* Tools */}
-                    <div className="space-y-3">
-                        <div>
-                            <Label className="text-sm font-semibold flex items-center gap-2">
-                                <Wrench className="h-4 w-4 text-primary" />
-                                Ferramentas
-                            </Label>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                O agente usará estas ferramentas proativamente durante as conversas para buscar informações reais.
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {availableTools.map((tool) => {
-                                const ToolIcon = tool.icon;
-                                const isEnabled = enabledTools.includes(tool.id);
-                                return (
-                                    <Card
-                                        key={tool.id}
-                                        className={cn(
-                                            "p-3 cursor-pointer transition-all",
-                                            isEnabled
-                                                ? "border-primary bg-primary/5 shadow-sm"
-                                                : "opacity-60 hover:opacity-100 hover:border-muted-foreground/30"
-                                        )}
-                                        onClick={() => toggleTool(tool.id)}
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <Checkbox checked={isEnabled} className="mt-0.5" />
-                                            <div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <ToolIcon className="h-3.5 w-3.5 text-primary" />
-                                                    <span className="text-sm font-medium">{tool.label}</span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    </div>
-
                     {/* Keywords */}
                     <div className="space-y-2">
                         <Label className="text-sm">Palavras-chave de ativação</Label>
@@ -621,91 +832,253 @@ export const SuperAgentWizard = ({
             )}
 
             {/* ═══════════════════════════════════════════════ */}
+            {/* STEP 4: FERRAMENTAS                               */}
+            {/* ═══════════════════════════════════════════════ */}
+            {currentStep === "tools" && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+
+                    {/* Tip */}
+                    <Card className="p-4 bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-red-500/5 border-amber-500/20">
+                        <div className="flex gap-3">
+                            <div className="p-2 rounded-lg bg-amber-500/10 shrink-0 h-fit">
+                                <Wrench className="h-5 w-5 text-amber-500" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium">Ferramentas dão superpoderes ao agente</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Com ferramentas ativadas, o agente pode <strong>consultar dados reais</strong> do
+                                    seu sistema — como agendamentos, disponibilidade e dados do cliente —
+                                    em vez de inventar respostas.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Core Tools — Always Active */}
+                    <div className="space-y-3">
+                        <div>
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                <Lock className="h-4 w-4 text-emerald-500" />
+                                Ferramentas automáticas
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Sempre ativas em todos os agentes. Não podem ser desativadas.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {coreTools.map((tool) => {
+                                const ToolIcon = tool.icon;
+                                return (
+                                    <Card
+                                        key={tool.id}
+                                        className="p-3 border-emerald-500/30 bg-emerald-500/5"
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <Check className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <ToolIcon className="h-3.5 w-3.5 text-emerald-500" />
+                                                    <span className="text-sm font-medium">{tool.label}</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Optional Tools */}
+                    <div className="space-y-3">
+                        <div>
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                <Wrench className="h-4 w-4 text-primary" />
+                                Ferramentas opcionais
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Ative ou desative conforme a necessidade deste agente.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {optionalTools.map((tool) => {
+                                const ToolIcon = tool.icon;
+                                const isEnabled = enabledTools.includes(tool.id);
+                                return (
+                                    <Card
+                                        key={tool.id}
+                                        className={cn(
+                                            "p-3 cursor-pointer transition-all",
+                                            isEnabled
+                                                ? "border-primary bg-primary/5 shadow-sm"
+                                                : "opacity-60 hover:opacity-100 hover:border-muted-foreground/30"
+                                        )}
+                                        onClick={() => toggleTool(tool.id)}
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <Checkbox checked={isEnabled} className="mt-0.5" />
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <ToolIcon className="h-3.5 w-3.5 text-primary" />
+                                                    <span className="text-sm font-medium">{tool.label}</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════ */}
             {/* STEP 4: APLICAR                                   */}
             {/* ═══════════════════════════════════════════════ */}
             {currentStep === "apply" && (
                 <div className="space-y-5 animate-in fade-in duration-200">
 
-                    {/* Summary card */}
-                    <Card className="p-5 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 border-primary/20">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                <SelectedIconComp className="h-8 w-8" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg">{agentName || "Sem nome"}</h3>
-                                {personaName && <p className="text-sm text-muted-foreground">Persona: {personaName}</p>}
-                                <div className="flex gap-1.5 mt-1.5">
-                                    <Badge className="bg-gradient-to-r from-violet-500 to-purple-600 text-white text-[10px]">
-                                        SUPER AGENT
-                                    </Badge>
-                                    <Badge variant="outline" className="text-[10px]">
-                                        {enabledTools.length} ferramentas
-                                    </Badge>
-                                    <Badge variant="outline" className="text-[10px]">
-                                        {toneLabel}
-                                    </Badge>
+                    {/* Agent summary — compact hero */}
+                    <Card className="p-0 overflow-hidden border-0 shadow-xl">
+                        <div className="relative bg-gradient-to-br from-gray-100 via-slate-200 to-gray-100 dark:from-slate-800 dark:via-slate-700 dark:to-zinc-800 px-5 py-4">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(0,0,0,0.02),transparent_60%)] dark:bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.04),transparent_60%)]" />
+                            <div className="relative flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg">
+                                    <SelectedIconComp className="h-7 w-7 text-slate-700 dark:text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-slate-800 dark:text-white font-bold text-lg truncate">{agentName || "Sem nome"}</h3>
+                                        <Badge className="bg-slate-500/10 dark:bg-white/15 text-slate-600 dark:text-white text-[9px] border-0 shrink-0">SUPER AGENT</Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {personaName && (
+                                            <span className="text-xs text-slate-600 dark:text-white/70 bg-slate-500/10 dark:bg-white/10 px-2 py-0.5 rounded-full">{personaName}</span>
+                                        )}
+                                        <span className="text-xs text-slate-500 dark:text-white/50">{toneLabel}</span>
+                                        <span className="text-xs text-slate-300 dark:text-white/30">•</span>
+                                        <span className="text-xs text-slate-500 dark:text-white/50">{coreToolIds.length + enabledTools.filter(t => !coreToolIds.includes(t)).length} tools</span>
+                                    </div>
+                                    {businessGoal && (
+                                        <p className="text-slate-400 dark:text-white/45 text-xs mt-2 flex items-center gap-1.5 truncate">
+                                            <Target className="h-3 w-3 shrink-0" />
+                                            {businessGoal}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     </Card>
 
-                    {/* Prompt preview */}
-                    <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-2">
-                            <Eye className="h-4 w-4" />
-                            Preview do prompt
-                        </Label>
-                        <pre className="text-xs bg-muted p-3 rounded-lg max-h-[120px] overflow-auto whitespace-pre-wrap font-mono border">
-                            {systemPrompt.replace(/{persona}/g, personaName || agentName).slice(0, 500)}
-                            {systemPrompt.length > 500 && "..."}
-                        </pre>
-                    </div>
-
                     {/* Instance selection */}
                     <div className="space-y-3">
-                        <div>
-                            <Label className="text-sm font-semibold">Vincular a qual instância WhatsApp?</Label>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Selecione as instâncias que usarão este agente. Você pode mudar isso depois.
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-500/20">
+                                <Zap className="h-4 w-4 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold">Vincular instância WhatsApp</h4>
+                                <p className="text-[11px] text-muted-foreground">Selecione em quais números este agente vai atuar</p>
+                            </div>
                         </div>
+
                         {instances.length === 0 ? (
-                            <Card className="p-4 text-center border-dashed">
-                                <p className="text-sm text-muted-foreground">Nenhuma instância WhatsApp encontrada.</p>
+                            <Card className="p-8 text-center border-dashed">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center">
+                                        <MessageCircle className="h-6 w-6 text-muted-foreground/50" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Nenhuma instância encontrada</p>
+                                        <p className="text-xs text-muted-foreground/70 mt-1">Conecte um WhatsApp primeiro nas configurações</p>
+                                    </div>
+                                </div>
                             </Card>
                         ) : (
                             <div className="space-y-2">
-                                {instances.map((inst: any) => (
-                                    <Card
-                                        key={inst.id}
-                                        className={cn(
-                                            "p-3 cursor-pointer transition-all hover:shadow-sm",
-                                            selectedInstances.includes(inst.id) && "border-primary bg-primary/5 shadow-sm"
-                                        )}
-                                        onClick={() => {
-                                            setSelectedInstances((prev) =>
-                                                prev.includes(inst.id) ? prev.filter((id) => id !== inst.id) : [...prev, inst.id]
-                                            );
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <Checkbox checked={selectedInstances.includes(inst.id)} />
-                                            <div className="flex-1">
-                                                <p className="text-sm font-medium">{inst.display_name || inst.phone || "Instância"}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {inst.super_agent_id && inst.super_agent_id !== editAgent?.id
-                                                        ? "⚠️ Já tem outro agente vinculado"
-                                                        : inst.agent_engine === "super_agent" ? "Com agente" : "Sem agente"}
-                                                </p>
+                                {instances.map((inst: any) => {
+                                    const isSelected = selectedInstances.includes(inst.id);
+                                    const isConnected = inst.status === "connected";
+                                    const hasOtherAgent = inst.super_agent_id && inst.super_agent_id !== editAgent?.id;
+                                    const phone = inst.phone || "Sem número";
+                                    const name = inst.display_name || inst.instance_name || "Instância";
+
+                                    return (
+                                        <Card
+                                            key={inst.id}
+                                            className={cn(
+                                                "p-0 overflow-hidden cursor-pointer transition-all hover:shadow-md",
+                                                isSelected && "ring-2 ring-primary shadow-md",
+                                                hasOtherAgent && "opacity-75"
+                                            )}
+                                            onClick={() => {
+                                                setSelectedInstances((prev) =>
+                                                    prev.includes(inst.id) ? prev.filter((id) => id !== inst.id) : [...prev, inst.id]
+                                                );
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-4 p-4">
+                                                {/* Selection indicator */}
+                                                <div className={cn(
+                                                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all border-2",
+                                                    isSelected
+                                                        ? "bg-primary border-primary text-white"
+                                                        : "bg-muted/30 border-border text-muted-foreground"
+                                                )}>
+                                                    {isSelected ? (
+                                                        <Check className="h-5 w-5" />
+                                                    ) : (
+                                                        <MessageCircle className="h-4 w-4" />
+                                                    )}
+                                                </div>
+
+                                                {/* Instance info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-semibold truncate">{name}</p>
+                                                        {/* Connection status dot */}
+                                                        <div className={cn(
+                                                            "w-2 h-2 rounded-full shrink-0",
+                                                            isConnected ? "bg-emerald-500 shadow-sm shadow-emerald-500/50" : "bg-gray-400"
+                                                        )} />
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">{phone}</p>
+                                                    {hasOtherAgent && (
+                                                        <p className="text-[11px] text-amber-500 mt-1 flex items-center gap-1">
+                                                            <Info className="h-3 w-3" />
+                                                            Já vinculada a outro agente
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Status badge */}
+                                                <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "text-[10px] shrink-0",
+                                                        isConnected
+                                                            ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/5"
+                                                            : "border-border text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {isConnected ? "Online" : "Offline"}
+                                                </Badge>
                                             </div>
-                                            <Badge variant={inst.status === "connected" ? "default" : "secondary"} className="text-xs">
-                                                {inst.status || "offline"}
-                                            </Badge>
-                                        </div>
-                                    </Card>
-                                ))}
+                                        </Card>
+                                    );
+                                })}
                             </div>
+                        )}
+
+                        {/* Selection counter */}
+                        {instances.length > 0 && (
+                            <p className="text-[11px] text-muted-foreground text-center">
+                                {selectedInstances.length === 0
+                                    ? "Nenhuma instância selecionada — o agente pode ser vinculado depois"
+                                    : `${selectedInstances.length} instância${selectedInstances.length > 1 ? "s" : ""} selecionada${selectedInstances.length > 1 ? "s" : ""}`
+                                }
+                            </p>
                         )}
                     </div>
                 </div>

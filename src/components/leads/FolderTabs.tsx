@@ -19,6 +19,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useTranslation } from "react-i18next";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface LeadFolder {
   id: string;
@@ -26,6 +41,7 @@ export interface LeadFolder {
   color: string | null;
   lead_count: number;
   workspace_id: string;
+  sort_order: number;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -36,41 +52,30 @@ interface FolderTabsProps {
   onSelectFolder: (folderId: string | null) => void;
   onCreateFolder: () => void;
   onDeleteFolder?: (folderId: string) => void;
+  onReorderFolders?: (reorderedFolders: { id: string; sort_order: number }[]) => void;
   totalLeadsCount?: number;
   generalLeadsCount?: number;
   allowedFolderIds?: string[] | null;
   canManageTeam?: boolean;
 }
 
-export function FolderTabs({
-  folders,
-  selectedFolderId,
-  onSelectFolder,
-  onCreateFolder,
-  onDeleteFolder,
-  totalLeadsCount = 0,
-  generalLeadsCount = 0,
-  allowedFolderIds = null,
-  canManageTeam = true,
-}: FolderTabsProps) {
-  const { t } = useTranslation("leads");
-  const [folderToDelete, setFolderToDelete] = useState<LeadFolder | null>(null);
-
-  const TabButton = ({
-    isActive,
-    onClick,
-    icon: Icon,
-    label,
-    count,
-    color,
-  }: {
-    isActive: boolean;
-    onClick: () => void;
-    icon: React.ElementType;
-    label: string;
-    count?: number;
-    color?: string | null;
-  }) => (
+// Simple tab button
+function TabButton({
+  isActive,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+  color,
+}: {
+  isActive: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+  count?: number;
+  color?: string | null;
+}) {
+  return (
     <button
       onClick={onClick}
       className={cn(
@@ -100,11 +105,113 @@ export function FolderTabs({
       )}
     </button>
   );
+}
+
+// Sortable folder tab wrapper
+function SortableFolderTab({
+  folder,
+  isActive,
+  onSelect,
+  onDelete,
+  canManage,
+}: {
+  folder: LeadFolder;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: (folder: LeadFolder) => void;
+  canManage: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({ id: folder.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition: transform ? "transform 100ms linear" : undefined,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.5 : 1,
+    userSelect: "none",
+  };
+
+  const tab = (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TabButton
+        isActive={isActive}
+        onClick={onSelect}
+        icon={Folder}
+        label={folder.name}
+        count={folder.lead_count}
+        color={folder.color}
+      />
+    </div>
+  );
+
+  if (canManage) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{tab}</ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem
+            className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2"
+            onClick={() => onDelete(folder)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Excluir pasta
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+
+  return tab;
+}
+
+export function FolderTabs({
+  folders,
+  selectedFolderId,
+  onSelectFolder,
+  onCreateFolder,
+  onDeleteFolder,
+  onReorderFolders,
+  totalLeadsCount = 0,
+  generalLeadsCount = 0,
+  allowedFolderIds = null,
+  canManageTeam = true,
+}: FolderTabsProps) {
+  const { t } = useTranslation("leads");
+  const [folderToDelete, setFolderToDelete] = useState<LeadFolder | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const filteredFolders = folders.filter(
+    (folder) => allowedFolderIds === null || allowedFolderIds.includes(folder.id)
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = filteredFolders.findIndex((f) => f.id === active.id);
+    const newIndex = filteredFolders.findIndex((f) => f.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(filteredFolders, oldIndex, newIndex);
+    const updates = reordered.map((folder, index) => ({
+      id: folder.id,
+      sort_order: index,
+    }));
+    onReorderFolders?.(updates);
+  };
 
   const handleConfirmDelete = () => {
     if (folderToDelete && onDeleteFolder) {
       onDeleteFolder(folderToDelete.id);
-      // If the deleted folder was selected, go back to "Todos"
       if (selectedFolderId === folderToDelete.id) {
         onSelectFolder(null);
       }
@@ -116,7 +223,7 @@ export function FolderTabs({
     <>
       <div className="relative w-full mb-4">
         <div className="flex flex-wrap items-center gap-2 py-1 w-full">
-          {/* Tab: Todos (leads sem pasta) */}
+          {/* Tab: Todos */}
           <TabButton
             isActive={selectedFolderId === null || selectedFolderId === "general"}
             onClick={() => onSelectFolder(null)}
@@ -125,46 +232,28 @@ export function FolderTabs({
             count={generalLeadsCount}
           />
 
-          {/* Tabs: Pastas do usuário (filtered by access) */}
-          {folders
-            .filter((folder) => allowedFolderIds === null || allowedFolderIds.includes(folder.id))
-            .map((folder) =>
-              canManageTeam ? (
-                <ContextMenu key={folder.id}>
-                  <ContextMenuTrigger asChild>
-                    <div>
-                      <TabButton
-                        isActive={selectedFolderId === folder.id}
-                        onClick={() => onSelectFolder(folder.id)}
-                        icon={Folder}
-                        label={folder.name}
-                        count={folder.lead_count}
-                        color={folder.color}
-                      />
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="w-48">
-                    <ContextMenuItem
-                      className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2"
-                      onClick={() => setFolderToDelete(folder)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t("deleteFolder")}
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ) : (
-                <TabButton
+          {/* Draggable folder tabs */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={filteredFolders.map((f) => f.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {filteredFolders.map((folder) => (
+                <SortableFolderTab
                   key={folder.id}
+                  folder={folder}
                   isActive={selectedFolderId === folder.id}
-                  onClick={() => onSelectFolder(folder.id)}
-                  icon={Folder}
-                  label={folder.name}
-                  count={folder.lead_count}
-                  color={folder.color}
+                  onSelect={() => onSelectFolder(folder.id)}
+                  onDelete={setFolderToDelete}
+                  canManage={canManageTeam}
                 />
-              )
-            )}
+              ))}
+            </SortableContext>
+          </DndContext>
 
           {/* Botão: Criar pasta (admin only) */}
           {canManageTeam && (

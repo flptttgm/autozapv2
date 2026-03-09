@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +16,8 @@ import {
   ChevronRight,
   Filter,
   History,
-  Sun,
 } from "lucide-react";
+import { MdOutlineToday } from "react-icons/md";
 import { toast } from "sonner";
 import {
   startOfWeek,
@@ -39,7 +39,7 @@ import { AppointmentDetailsModal } from "@/components/appointments/AppointmentDe
 import { AppointmentHistoryTable } from "@/components/appointments/AppointmentHistoryTable";
 import { DayPreparationPanel } from "@/components/appointments/DayPreparationPanel";
 import { downloadICS } from "@/lib/ics-utils";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -337,6 +337,51 @@ const Appointments = () => {
     },
   });
 
+  // ─── Auto-complete confirmed appointments whose end_time has passed ───
+  const autoCompletedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!profile?.workspace_id) return;
+
+    const autoComplete = async () => {
+      const now = new Date().toISOString();
+
+      const { data: pastConfirmed } = await supabase
+        .from("appointments")
+        .select("id, title")
+        .eq("workspace_id", profile.workspace_id)
+        .eq("status", "confirmed")
+        .lt("end_time", now);
+
+      if (!pastConfirmed || pastConfirmed.length === 0) return;
+
+      // Filter out already processed ones in this session
+      const toComplete = pastConfirmed.filter(a => !autoCompletedRef.current.has(a.id));
+      if (toComplete.length === 0) return;
+
+      const ids = toComplete.map(a => a.id);
+
+      const { error } = await supabase
+        .from("appointments")
+        .update({ status: "completed" })
+        .in("id", ids);
+
+      if (!error) {
+        ids.forEach(id => autoCompletedRef.current.add(id));
+        queryClient.invalidateQueries({ queryKey: ["week-appointments"] });
+        queryClient.invalidateQueries({ queryKey: ["month-appointments"] });
+        queryClient.invalidateQueries({ queryKey: ["appointments-by-instance"] });
+        queryClient.invalidateQueries({ queryKey: ["appointments-today"] });
+        queryClient.invalidateQueries({ queryKey: ["confirmed-appointments-today"] });
+      }
+    };
+
+    // Run immediately and then every 60 seconds
+    autoComplete();
+    const interval = setInterval(autoComplete, 60_000);
+    return () => clearInterval(interval);
+  }, [profile?.workspace_id, queryClient]);
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
@@ -456,7 +501,7 @@ const Appointments = () => {
                     aria-label="Visualização diária"
                     className="px-3 sm:px-3 rounded-lg text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-md transition-all duration-200"
                   >
-                    <Sun className="h-4 w-4 sm:mr-1.5" />
+                    <MdOutlineToday className="h-4 w-4 sm:mr-1.5" />
                     <span className="text-sm sm:text-sm hidden sm:inline">
                       Dia
                     </span>
@@ -492,7 +537,6 @@ const Appointments = () => {
                     </span>
                   </ToggleGroupItem>
                 </ToggleGroup>
-                {/* Removed Botões de ação -> Moved to global header */}
               </div>
             </div>
             {/* Linha 2: < > Hoje + Filtros */}
@@ -566,7 +610,7 @@ const Appointments = () => {
             ) : (
               <>
                 {/* Calendar View */}
-                <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0 min-w-0 gap-4">
+                <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0 min-w-[280px] gap-4">
                   <Card className="flex-1 overflow-hidden flex flex-col glass border-border/40 shadow-sm">
                     {viewMode === "day" ? (
                       <DailyView

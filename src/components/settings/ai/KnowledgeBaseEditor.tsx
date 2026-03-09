@@ -16,7 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -36,9 +36,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Building2, Briefcase, DollarSign, HelpCircle, FileText, FileQuestion, Upload, Info, Globe, Bot, Loader2, CheckCircle, AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Briefcase, DollarSign, HelpCircle, FileText, FileQuestion, Upload, Info, Globe, Bot, Loader2, CheckCircle, AlertCircle, Clock, RefreshCw, User, Heart, Star, Zap, Sparkles, Shield, Target, Award, Crown, Lightbulb, Rocket, Brain, Wrench, Coffee, MessageCircle, Tags } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FileUploadDialog } from "./FileUploadDialog";
 import { useAuditLog } from "@/hooks/useAuditLog";
+import { useTranslation } from "react-i18next";
 
 interface KnowledgeItem {
   id: string;
@@ -63,13 +65,24 @@ interface Agent {
 }
 
 const categories = [
-  { value: "company", label: "Empresa", icon: Building2, color: "bg-blue-500" },
-  { value: "services", label: "Serviços", icon: Briefcase, color: "bg-green-500" },
-  { value: "pricing", label: "Preços", icon: DollarSign, color: "bg-yellow-500" },
-  { value: "faq", label: "FAQ", icon: HelpCircle, color: "bg-purple-500" },
-  { value: "policies", label: "Políticas", icon: FileText, color: "bg-orange-500" },
-  { value: "custom", label: "Personalizado", icon: FileQuestion, color: "bg-gray-500" },
+  { value: "company", label: "Empresa", icon: Building2, color: "bg-blue-500", lightColor: "bg-blue-100 dark:bg-blue-500/20", textColor: "text-blue-600 dark:text-blue-400" },
+  { value: "services", label: "Serviços", icon: Briefcase, color: "bg-green-500", lightColor: "bg-green-100 dark:bg-green-500/20", textColor: "text-green-600 dark:text-green-400" },
+  { value: "pricing", label: "Preços", icon: DollarSign, color: "bg-yellow-500", lightColor: "bg-yellow-100 dark:bg-yellow-500/20", textColor: "text-yellow-600 dark:text-yellow-400" },
+  { value: "faq", label: "FAQ", icon: HelpCircle, color: "bg-purple-500", lightColor: "bg-purple-100 dark:bg-purple-500/20", textColor: "text-purple-600 dark:text-purple-400" },
+  { value: "policies", label: "Políticas", icon: FileText, color: "bg-orange-500", lightColor: "bg-orange-100 dark:bg-orange-500/20", textColor: "text-orange-600 dark:text-orange-400" },
+  { value: "custom", label: "Personalizado", icon: FileQuestion, color: "bg-gray-500", lightColor: "bg-gray-100 dark:bg-gray-500/20", textColor: "text-gray-600 dark:text-gray-400" },
 ];
+
+const agentIconOptions = [
+  { id: "bot", icon: Bot }, { id: "user", icon: User }, { id: "heart", icon: Heart },
+  { id: "star", icon: Star }, { id: "zap", icon: Zap }, { id: "sparkles", icon: Sparkles },
+  { id: "shield", icon: Shield }, { id: "target", icon: Target }, { id: "award", icon: Award },
+  { id: "crown", icon: Crown }, { id: "lightbulb", icon: Lightbulb }, { id: "rocket", icon: Rocket },
+  { id: "brain", icon: Brain }, { id: "wrench", icon: Wrench }, { id: "coffee", icon: Coffee },
+  { id: "message-circle", icon: MessageCircle },
+];
+
+const getAgentIcon = (id: string) => agentIconOptions.find((o) => o.id === id)?.icon || Bot;
 
 const categoryTemplates: Record<string, { title: string; content: string }> = {
   company: {
@@ -213,6 +226,7 @@ interface KnowledgeBaseEditorProps {
 export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) => {
   const queryClient = useQueryClient();
   const { logChange } = useAuditLog();
+  const { t } = useTranslation("agents");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<KnowledgeItem | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -327,6 +341,14 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       return resultItemId;
     },
     onSuccess: (itemId) => {
+      // Chamar edge function para gerar embedding (fire-and-forget)
+      supabase.functions.invoke('generate-embedding', {
+        body: {
+          action: 'generate_for_item',
+          knowledge_item_id: itemId,
+        }
+      }).catch(e => console.error('Erro ao chamar generate-embedding:', e));
+
       // Iniciar polling para verificar status do embedding
       setSavedItemId(itemId);
       setIsWaitingEmbedding(true);
@@ -399,20 +421,15 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
         .update({ embedding_status: 'pending' })
         .eq("id", itemId);
 
-      // Chamar edge function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-embedding`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-        },
-        body: JSON.stringify({
+      // Chamar edge function via supabase client
+      const { error } = await supabase.functions.invoke('generate-embedding', {
+        body: {
           action: 'generate_for_item',
-          knowledge_item_id: itemId
-        })
+          knowledge_item_id: itemId,
+        }
       });
 
-      if (!response.ok) {
+      if (error) {
         throw new Error('Falha ao reprocessar');
       }
 
@@ -529,10 +546,9 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h3 className="text-lg font-semibold">Base de Conhecimento</h3>
+        <h3 className="text-lg font-semibold">{t("knowledgeBase.title")}</h3>
         <p className="text-sm text-muted-foreground">
-          Configure as informações que a IA deve conhecer sobre seu negócio.
-          Essas informações serão usadas para responder clientes com dados reais.
+          {t("knowledgeBase.description")}
         </p>
       </div>
 
@@ -540,8 +556,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Por padrão, itens de conhecimento são <strong>compartilhados entre todos os agentes</strong>.
-          Você pode restringir a agentes específicos ao criar ou editar um item.
+          {t("knowledgeBase.info")}
         </AlertDescription>
       </Alert>
 
@@ -549,7 +564,7 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-2">
           <Input
-            placeholder="Buscar..."
+            placeholder={t("knowledgeBase.search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1"
@@ -559,10 +574,10 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="all">{t("knowledgeBase.categories.all")}</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
-                  {cat.label}
+                  {t(`knowledgeBase.categories.${cat.value}`) || cat.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -572,182 +587,238 @@ export const KnowledgeBaseEditor = ({ workspaceId }: KnowledgeBaseEditorProps) =
         <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsFileUploadOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
-            Importar Arquivo
+            {t("knowledgeBase.importFile")}
+          </Button>
+
+          <Button className="w-full sm:w-auto" onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t("knowledgeBase.addItem")}
           </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-200 ease-out">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingItem ? "Editar Item" : "Novo Item"}
-                </DialogTitle>
-              </DialogHeader>
+            <DialogContent className="w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-200 ease-out p-0">
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">
+                    {editingItem ? "Editar Conhecimento" : "Novo Conhecimento"}
+                  </DialogTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Informações que seus agentes usarão para responder com dados reais.
+                  </p>
+                </DialogHeader>
+              </div>
 
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Categoria</Label>
-                  <Select value={formData.category} onValueChange={handleCategoryChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => {
-                        const Icon = cat.icon;
-                        return (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {cat.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+              <div className="px-6 py-5 space-y-6">
+                {/* Category Chips */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Categoria</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((cat) => {
+                      const Icon = cat.icon;
+                      const isSelected = formData.category === cat.value;
+                      return (
+                        <button
+                          key={cat.value}
+                          type="button"
+                          onClick={() => handleCategoryChange(cat.value)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                            isSelected
+                              ? `${cat.lightColor} ${cat.textColor} border-current shadow-sm`
+                              : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
+                {/* Title */}
                 <div className="space-y-2">
-                  <Label>Título</Label>
+                  <Label className="text-sm font-medium">Título</Label>
                   <Input
                     value={formData.title}
                     onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Ex: Pacote E-commerce Completo"
+                    className="h-10"
                   />
                 </div>
 
+                {/* Content */}
                 <div className="space-y-2">
-                  <Label>Conteúdo</Label>
+                  <Label className="text-sm font-medium">Conteúdo</Label>
                   <Textarea
                     value={formData.content}
                     onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
                     placeholder="Descreva todas as informações que a IA deve saber..."
-                    rows={8}
+                    rows={6}
+                    className="resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Seja detalhado! Inclua valores, condições, prazos, etc.
+                    Seja detalhado — valores, condições, prazos, diferenciais.
                   </p>
                 </div>
 
+                {/* Keywords */}
                 <div className="space-y-2">
-                  <Label>Palavras-chave (opcional)</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Tags className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Palavras-chave</Label>
+                    <span className="text-xs text-muted-foreground">(opcional)</span>
+                  </div>
                   <Input
                     value={formData.keywords}
                     onChange={(e) => setFormData((prev) => ({ ...prev, keywords: e.target.value }))}
                     placeholder="ecommerce, loja virtual, site (separadas por vírgula)"
+                    className="h-10"
                   />
                 </div>
 
-                {/* Agent Selection */}
-                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                  <Label className="text-base font-medium">Disponível para</Label>
+                {/* Agent Assignment */}
+                <div className="space-y-3 rounded-xl border p-4">
+                  <Label className="text-sm font-medium">Disponível para</Label>
 
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
                       onClick={() => setFormData(prev => ({ ...prev, is_global: true, agent_ids: [] }))}
+                      className={cn(
+                        "flex items-center gap-2.5 p-3 rounded-lg border transition-all text-left",
+                        formData.is_global
+                          ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-sm"
+                          : "border-border hover:bg-muted/50"
+                      )}
                     >
-                      <Globe className="h-4 w-4" />
-                      <span className="text-sm font-medium">Todos os agentes</span>
-                    </div>
+                      <div className={cn(
+                        "p-1.5 rounded-lg",
+                        formData.is_global ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                      )}>
+                        <Globe className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium block">Global</span>
+                        <span className="text-[11px] text-muted-foreground">Todos os agentes</span>
+                      </div>
+                    </button>
 
-                    <div
-                      className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${!formData.is_global ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}
+                    <button
+                      type="button"
                       onClick={() => setFormData(prev => ({ ...prev, is_global: false }))}
+                      className={cn(
+                        "flex items-center gap-2.5 p-3 rounded-lg border transition-all text-left",
+                        !formData.is_global
+                          ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-sm"
+                          : "border-border hover:bg-muted/50"
+                      )}
                     >
-                      <Bot className="h-4 w-4" />
-                      <span className="text-sm font-medium">Agentes específicos</span>
-                    </div>
+                      <div className={cn(
+                        "p-1.5 rounded-lg",
+                        !formData.is_global ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                      )}>
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium block">Específico</span>
+                        <span className="text-[11px] text-muted-foreground">Agentes selecionados</span>
+                      </div>
+                    </button>
                   </div>
 
                   {!formData.is_global && (
-                    <div className="space-y-2 pt-2">
+                    <div className="pt-2 space-y-2">
                       {agents && agents.length > 0 ? (
-                        <div className="grid gap-2">
-                          {agents.map((agent) => (
-                            <div key={agent.id} className="flex items-center gap-2">
-                              <Checkbox
-                                id={`agent-${agent.id}`}
-                                checked={formData.agent_ids.includes(agent.id)}
-                                onCheckedChange={(checked) => handleAgentToggle(agent.id, !!checked)}
-                              />
+                        <div className="grid gap-1.5">
+                          {agents.map((agent) => {
+                            const AgentIcon = getAgentIcon(agent.icon);
+                            const isChecked = formData.agent_ids.includes(agent.id);
+                            return (
                               <label
+                                key={agent.id}
                                 htmlFor={`agent-${agent.id}`}
-                                className="text-sm cursor-pointer flex items-center gap-2"
+                                className={cn(
+                                  "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all",
+                                  isChecked
+                                    ? "border-primary/30 bg-primary/5 dark:bg-primary/10"
+                                    : "border-transparent hover:bg-muted/50"
+                                )}
                               >
-                                <Bot className="h-3 w-3 text-muted-foreground" />
-                                {agent.name}
+                                <Checkbox
+                                  id={`agent-${agent.id}`}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => handleAgentToggle(agent.id, !!checked)}
+                                />
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/15 to-violet-500/15 flex items-center justify-center">
+                                  <AgentIcon className="h-3.5 w-3.5 text-primary" />
+                                </div>
+                                <span className="text-sm font-medium">{agent.name}</span>
                               </label>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Nenhum agente criado. Crie agentes na aba "Agentes" primeiro.
+                        <p className="text-sm text-muted-foreground text-center py-3">
+                          Nenhum agente criado. Crie na aba "Agentes" primeiro.
                         </p>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Prioridade</Label>
+                {/* Priority & Status row */}
+                <div className="flex items-center justify-between gap-4 pt-1">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-sm font-medium shrink-0">Prioridade</Label>
                     <Input
                       type="number"
                       value={formData.priority}
                       onChange={(e) => setFormData((prev) => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
                       min={0}
                       max={100}
+                      className="w-20 h-9 text-center"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Maior = aparece primeiro
-                    </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <div className="flex items-center gap-2 pt-2">
-                      <Switch
-                        checked={formData.is_active}
-                        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
-                      />
-                      <span className="text-sm">
-                        {formData.is_active ? "Ativo" : "Inativo"}
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2.5">
+                    <Switch
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+                    />
+                    <span className={cn("text-sm font-medium", formData.is_active ? "text-green-600" : "text-muted-foreground")}>
+                      {formData.is_active ? "Ativo" : "Inativo"}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDialogClose(false)}
-                    disabled={isWaitingEmbedding}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={saveMutation.isPending || isWaitingEmbedding}
-                  >
-                    {isWaitingEmbedding ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Indexando...
-                      </>
-                    ) : saveMutation.isPending ? (
-                      "Salvando..."
-                    ) : (
-                      "Salvar"
-                    )}
-                  </Button>
-                </div>
+              {/* Footer */}
+              <div className="px-6 py-4 border-t bg-muted/30 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDialogClose(false)}
+                  disabled={isWaitingEmbedding}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={saveMutation.isPending || isWaitingEmbedding}
+                >
+                  {isWaitingEmbedding ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Indexando...
+                    </>
+                  ) : saveMutation.isPending ? (
+                    "Salvando..."
+                  ) : editingItem ? (
+                    "Atualizar"
+                  ) : (
+                    "Criar Conhecimento"
+                  )}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

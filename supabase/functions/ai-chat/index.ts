@@ -49,7 +49,7 @@ serve(async (req) => {
 
     console.log(`AI chat request from user: ${user.id}`);
 
-    const { messages, model: requestedModel } = await req.json();
+    const { messages, model: requestedModel, type = 'autozap' } = await req.json();
 
     // Resolve model configuration
     const modelKey = requestedModel && MODEL_CONFIG[requestedModel] ? requestedModel : DEFAULT_MODEL;
@@ -63,7 +63,29 @@ serve(async (req) => {
 
     console.log(`Using model: ${modelConfig.label} (${modelConfig.modelId}) via ${modelConfig.provider}`);
 
-    const systemPrompt = `
+    let systemPrompt = '';
+
+    if (type === 'general') {
+      systemPrompt = `Você é um assistente genérico e prestativo.
+Sua função primária é ajudar o usuário com pesquisas livres, criação de conteúdo, ou qualquer outro assunto que não seja especificamente estrutural do AutoZap.
+Você pode fornecer informações gerais, códigos, traduções, conselhos, e pesquisas na internet se possuir os meios.
+Seja sempre amigável, direto e responda em português brasileiro.
+Use formatação Markdown apropriada para deixar a resposta legível e profissional.`;
+    } else if (type === 'prompt-creator') {
+      systemPrompt = `Você é um Especialista em Criação de Prompts para Agentes de IA do AutoZap.
+Seu objetivo é ajudar os usuários a criar instruções de comportamento perfeitas, claras e blindadas para seus bots de WhatsApp.
+
+Um bom prompt do AutoZap deve ter:
+1. Identidade e Persona (Ex: "Você é o Carlos, atendente da AutoMecânica Silva, empático, direto e com linguagem simples.")
+2. Objetivo Final (Ex: "Qualificar o lead e agendar uma visita presencial.")
+3. Regras e Contenção (Ex: "Responda apenas sobre mecânica. Não invente preços. Mensagens CURTAS como as de WhatsApp. NUNCA faça textos longos.")
+4. Processo / Roteiro (Ex: "Primeiro cumprimente, depois pergunte o modelo do carro, qual o problema, etc.")
+
+Quando o usuário pedir, elabore um prompt estruturado em Markdown, pronto para ele copiar e colar no painel do AutoZap. Faça perguntas adicionais se o contexto que o usuário forneceu foi muito raso.
+Sempre que você gerar um prompt pronto finalizado, adicione no final da sua resposta exatamente este texto: 
+[IR PARA: Agentes]`;
+    } else {
+      systemPrompt = `
 ## 🔴 REGRAS INVIOLÁVEIS (PRIORIDADE MÁXIMA)
 
 1. "Automações" (em Agentes) = APENAS boas-vindas em grupos WhatsApp
@@ -130,6 +152,7 @@ O AutoZap utiliza RAG (Retrieval-Augmented Generation) para respostas precisas:
 ⚠️ "Automações" em Agentes é para GRUPOS, não controla respostas da IA.
 
 Responda em português brasileiro, seja objetivo e use nomes exatos de menus/botões.`;
+    }
 
     // ─── Route to the correct API ───────────────────
     let response: Response;
