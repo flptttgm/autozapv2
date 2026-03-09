@@ -2,55 +2,122 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserWorkspaces } from "@/hooks/useUserWorkspaces";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar, FileText, Receipt, LayoutGrid } from "lucide-react";
+import {
+  Calendar,
+  FileText,
+  Receipt,
+  LayoutGrid,
+  LayoutDashboard,
+  Bot,
+  Contact,
+  MessageSquare,
+  Cast,
+} from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 
 interface PageVisibility {
+  dashboard: boolean;
+  agents: boolean;
+  leads: boolean;
+  conversations: boolean;
   appointments: boolean;
   quotes: boolean;
   invoices: boolean;
+  whatsapp: boolean;
 }
 
 const DEFAULT_VISIBILITY: PageVisibility = {
+  dashboard: true,
+  agents: true,
+  leads: true,
+  conversations: true,
   appointments: true,
   quotes: true,
   invoices: true,
+  whatsapp: true,
 };
 
-const PAGES_CONFIG = [
-  {
-    key: "appointments" as const,
-    label: "Agendamentos",
-    description: "Gerencie compromissos e horários",
-    icon: Calendar,
-  },
-  {
-    key: "quotes" as const,
-    label: "Orçamentos",
-    description: "Visualize propostas comerciais da IA",
-    icon: FileText,
-  },
-  {
-    key: "invoices" as const,
-    label: "Cobranças",
-    description: "Gerencie faturas e pagamentos",
-    icon: Receipt,
-  },
-];
+const PAGES_CONFIG: {
+  key: keyof PageVisibility;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  /** If true, only shown for custom workspaces. If false/undefined, shown for all. */
+  customOnly?: boolean;
+}[] = [
+    {
+      key: "dashboard",
+      label: "Dashboard",
+      description: "Painel principal com métricas e resumos",
+      icon: LayoutDashboard,
+      customOnly: true,
+    },
+    {
+      key: "agents",
+      label: "Agentes IA",
+      description: "Gerencie agentes de atendimento",
+      icon: Bot,
+      customOnly: true,
+    },
+    {
+      key: "leads",
+      label: "Leads / Contatos",
+      description: "Base de contatos e clientes",
+      icon: Contact,
+      customOnly: true,
+    },
+    {
+      key: "conversations",
+      label: "Conversas",
+      description: "Histórico de mensagens",
+      icon: MessageSquare,
+      customOnly: true,
+    },
+    {
+      key: "appointments",
+      label: "Agendamentos",
+      description: "Gerencie compromissos e horários",
+      icon: Calendar,
+    },
+    {
+      key: "quotes",
+      label: "Orçamentos",
+      description: "Visualize propostas comerciais da IA",
+      icon: FileText,
+    },
+    {
+      key: "invoices",
+      label: "Cobranças",
+      description: "Gerencie faturas e pagamentos",
+      icon: Receipt,
+    },
+    {
+      key: "whatsapp",
+      label: "Conexões WhatsApp",
+      description: "Instâncias e integrações de WhatsApp",
+      icon: Cast,
+      customOnly: true,
+    },
+  ];
 
 export const SidebarPagesVisibility = () => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const { activeWorkspace } = useUserWorkspaces();
   const workspaceId = profile?.workspace_id;
+  const isCustomWorkspace = activeWorkspace?.template === "custom";
+  const configKey = isCustomWorkspace ? "custom_workspace_pages" : "sidebar_pages_visibility";
 
   const [visibility, setVisibility] = useState<PageVisibility>(DEFAULT_VISIBILITY);
 
   const { data: savedVisibility, isLoading } = useQuery({
-    queryKey: ["sidebar-visibility", workspaceId],
+    queryKey: ["sidebar-visibility-full", workspaceId, configKey],
     queryFn: async () => {
       if (!workspaceId) return DEFAULT_VISIBILITY;
 
@@ -58,16 +125,21 @@ export const SidebarPagesVisibility = () => {
         .from("system_config")
         .select("config_value")
         .eq("workspace_id", workspaceId)
-        .eq("config_key", "sidebar_pages_visibility")
+        .eq("config_key", configKey)
         .maybeSingle();
 
       if (!data?.config_value) return DEFAULT_VISIBILITY;
 
       const configValue = data.config_value as Record<string, boolean>;
       return {
+        dashboard: configValue.dashboard ?? true,
+        agents: configValue.agents ?? true,
+        leads: configValue.leads ?? true,
+        conversations: configValue.conversations ?? true,
         appointments: configValue.appointments ?? true,
         quotes: configValue.quotes ?? true,
         invoices: configValue.invoices ?? true,
+        whatsapp: configValue.whatsapp ?? true,
       };
     },
     enabled: !!workspaceId,
@@ -87,14 +159,10 @@ export const SidebarPagesVisibility = () => {
         .from("system_config")
         .select("id")
         .eq("workspace_id", workspaceId)
-        .eq("config_key", "sidebar_pages_visibility")
+        .eq("config_key", configKey)
         .maybeSingle();
 
-      const configValueJson: Json = {
-        appointments: newVisibility.appointments,
-        quotes: newVisibility.quotes,
-        invoices: newVisibility.invoices,
-      };
+      const configValueJson: Json = { ...newVisibility };
 
       if (existing) {
         const { error } = await supabase
@@ -107,7 +175,7 @@ export const SidebarPagesVisibility = () => {
           .from("system_config")
           .insert({
             workspace_id: workspaceId,
-            config_key: "sidebar_pages_visibility",
+            config_key: configKey,
             config_value: configValueJson,
           });
         if (error) throw error;
@@ -115,6 +183,8 @@ export const SidebarPagesVisibility = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sidebar-visibility"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-visibility-full"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-workspace-pages"] });
       toast.success("Configuração salva!");
     },
     onError: (error) => {
@@ -138,7 +208,7 @@ export const SidebarPagesVisibility = () => {
           <div className="h-6 bg-muted rounded w-1/3"></div>
           <div className="h-4 bg-muted rounded w-2/3"></div>
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="h-14 bg-muted rounded"></div>
             ))}
           </div>
@@ -158,30 +228,32 @@ export const SidebarPagesVisibility = () => {
       </p>
 
       <div className="space-y-3">
-        {PAGES_CONFIG.map(({ key, label, description, icon: Icon }) => (
-          <div
-            key={key}
-            className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
-                <Icon className="h-4 w-4 text-primary" />
+        {PAGES_CONFIG
+          .filter(({ customOnly }) => isCustomWorkspace || !customOnly)
+          .map(({ key, label, description, icon: Icon }) => (
+            <div
+              key={key}
+              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+                  <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <Label htmlFor={`toggle-${key}`} className="font-medium cursor-pointer">
+                    {label}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                </div>
               </div>
-              <div>
-                <Label htmlFor={`toggle-${key}`} className="font-medium cursor-pointer">
-                  {label}
-                </Label>
-                <p className="text-xs text-muted-foreground">{description}</p>
-              </div>
+              <Switch
+                id={`toggle-${key}`}
+                checked={visibility[key]}
+                onCheckedChange={() => handleToggle(key)}
+                disabled={updateMutation.isPending}
+              />
             </div>
-            <Switch
-              id={`toggle-${key}`}
-              checked={visibility[key]}
-              onCheckedChange={() => handleToggle(key)}
-              disabled={updateMutation.isPending}
-            />
-          </div>
-        ))}
+          ))}
       </div>
     </Card>
   );

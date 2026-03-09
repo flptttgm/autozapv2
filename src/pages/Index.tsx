@@ -56,6 +56,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { SupportChatSidebar } from "@/components/SupportChatSidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SalesFunnelCard } from "@/components/dashboard/SalesFunnelCard";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 import { UpcomingAppointmentsCard } from "@/components/dashboard/UpcomingAppointmentsCard";
 import { SuperAgentsPromoCard } from "@/components/dashboard/SuperAgentsPromoCard";
 
@@ -96,6 +97,7 @@ const Index = () => {
   const { t, i18n } = useTranslation("dashboard");
   const { profile } = useAuth();
   const isMobile = useIsMobile();
+  const { allowedFolderIds } = useLeadFolderAccess();
 
   // Check WhatsApp connection status
   const { data: whatsappStatus } = useQuery({
@@ -267,9 +269,12 @@ const Index = () => {
   });
 
   const { data: recentMessages } = useQuery({
-    queryKey: ["recent-messages", profile?.workspace_id],
+    queryKey: ["recent-messages", profile?.workspace_id, allowedFolderIds],
     queryFn: async () => {
       if (!profile?.workspace_id) return [];
+
+      // If member has folder restrictions but no folders assigned, show nothing
+      if (allowedFolderIds !== null && allowedFolderIds.length === 0) return [];
 
       // First, get recent messages with lead info
       const { data, error } = await supabase
@@ -281,8 +286,25 @@ const Index = () => {
 
       if (error) throw error;
 
+      let filteredData = data;
+
+      // Filter by allowed folders for restricted members
+      if (allowedFolderIds !== null && allowedFolderIds.length > 0) {
+        const { data: folderRelations } = await supabase
+          .from("lead_folder_relations")
+          .select("lead_id")
+          .in("folder_id", allowedFolderIds);
+
+        const allowedLeadIds = new Set(
+          (folderRelations || []).map((r: any) => r.lead_id)
+        );
+        filteredData = data.filter(
+          (msg: any) => msg.lead_id && allowedLeadIds.has(msg.lead_id)
+        );
+      }
+
       // Get unique conversations (most recent message per chat_id)
-      const uniqueConvs = data
+      const uniqueConvs = filteredData
         .reduce((acc: any[], msg: any) => {
           if (!acc.find((c) => c.chat_id === msg.chat_id)) {
             acc.push(msg);

@@ -12,6 +12,7 @@ import { useTerminology } from "@/hooks/useTerminology";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { MdGroupAdd } from "react-icons/md";
 import { useTranslation } from "react-i18next";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 
 interface LeadsSidebarItemProps {
   collapsed: boolean;
@@ -25,6 +26,7 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
+  const { allowedFolderIds } = useLeadFolderAccess();
 
   const isLeadsRoute = location.pathname === "/leads" || location.pathname.startsWith("/leads/");
   const selectedInstance = searchParams.get("instance");
@@ -34,9 +36,14 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
 
   // Fetch leads counts grouped by instance
   const { data: leadsCounts } = useQuery({
-    queryKey: ["leads-by-instance", profile?.workspace_id],
+    queryKey: ["leads-by-instance", profile?.workspace_id, allowedFolderIds],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, newLeads: 0, byInstance: {} };
+
+      // Member with no folders assigned sees 0
+      if (allowedFolderIds !== null && allowedFolderIds.length === 0) {
+        return { total: 0, newLeads: 0, byInstance: {} };
+      }
 
       const { data, error } = await supabase
         .from("leads")
@@ -45,11 +52,29 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
 
       if (error) throw error;
 
+      let filteredData = data || [];
+
+      // Filter by allowed folders for restricted members
+      if (allowedFolderIds !== null && allowedFolderIds.length > 0) {
+        const leadIds = filteredData.map((l: any) => l.id);
+        if (leadIds.length > 0) {
+          const { data: folderRelations } = await supabase
+            .from("lead_folder_relations")
+            .select("lead_id")
+            .in("folder_id", allowedFolderIds)
+            .in("lead_id", leadIds);
+          const allowedLeadIds = new Set((folderRelations || []).map((r: any) => r.lead_id));
+          filteredData = filteredData.filter((l: any) => allowedLeadIds.has(l.id));
+        } else {
+          filteredData = [];
+        }
+      }
+
       const byInstance: Record<string, { total: number; new: number }> = {};
       let total = 0;
       let newLeads = 0;
 
-      data?.forEach((lead) => {
+      filteredData.forEach((lead) => {
         total++;
         if (lead.status === 'new') newLeads++;
 
@@ -103,9 +128,9 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
             )}
           >
             <MdGroupAdd className="h-7 w-7" />
-            {totalNewLeads > 0 && (
+            {totalLeads > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-blue-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
-                {totalNewLeads > 9 ? "9+" : totalNewLeads}
+                {totalLeads > 9 ? "9+" : totalLeads}
               </span>
             )}
           </Link>
@@ -152,9 +177,9 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
           isActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
         )} />
         <span className="flex-1 text-left min-w-[60px]">{terminology.plural}</span>
-        {totalNewLeads > 0 && (
+        {totalLeads > 0 && (
           <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
-            {totalNewLeads > 99 ? "99+" : totalNewLeads}
+            {totalLeads > 99 ? "99+" : totalLeads}
           </Badge>
         )}
       </Link>
@@ -179,9 +204,9 @@ export const LeadsSidebarItem = ({ collapsed }: LeadsSidebarItemProps) => {
             isParentActive ? "h-[21px] w-[21px]" : "h-5 w-5 group-hover:scale-105"
           )} />
           <span className="flex-1 text-left min-w-[60px]">{terminology.plural}</span>
-          {totalNewLeads > 0 && (
+          {totalLeads > 0 && (
             <Badge className="h-5 px-1.5 text-[10px] bg-blue-500 hover:bg-blue-600 text-white border-0">
-              {totalNewLeads > 99 ? "99+" : totalNewLeads}
+              {totalLeads > 99 ? "99+" : totalLeads}
             </Badge>
           )}
           {effectiveOpen ? (

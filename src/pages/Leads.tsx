@@ -249,11 +249,28 @@ const Leads = () => {
       query = query.eq("whatsapp_instance_id", instanceFilter);
     }
 
-    // Folder filter: null means the default "Todos" (leads without folder)
-    if (selectedFolderId === null || selectedFolderId === "general") {
-      query = query.filter("folder_ids", "eq", "{}");
-    } else if (selectedFolderId) {
-      query = query.contains("folder_ids", [selectedFolderId]);
+    // ── Folder access enforcement for non-admin members ──
+    // When a member has folder restrictions, they should ONLY see leads
+    // that belong to at least one of their allowed folders.
+    if (allowedFolderIds !== null) {
+      // Member has restrictions — enforce folder-based access
+      if (selectedFolderId && selectedFolderId !== "general") {
+        // Specific folder selected (already validated by FolderTabs)
+        query = query.contains("folder_ids", [selectedFolderId]);
+      } else if (allowedFolderIds.length === 0) {
+        // Member has no folders assigned — show nothing
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+      } else {
+        // Default "Todos" tab — show leads in ANY of the allowed folders
+        query = query.overlaps("folder_ids", allowedFolderIds);
+      }
+    } else {
+      // Admin/owner — original behavior
+      if (selectedFolderId === null || selectedFolderId === "general") {
+        query = query.filter("folder_ids", "eq", "{}");
+      } else if (selectedFolderId) {
+        query = query.contains("folder_ids", [selectedFolderId]);
+      }
     }
 
     // Search filter - applied server-side for better performance

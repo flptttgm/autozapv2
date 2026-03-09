@@ -9,6 +9,14 @@ interface WorkspaceRole {
     isMember: boolean;
     /** True if user is owner or admin */
     canManageTeam: boolean;
+    /** True if user can access workspace-level settings (owner + admin) */
+    canAccessSettings: boolean;
+    /** True if user can manage workspace config — pages, integrations, billing (owner only) */
+    canManageWorkspace: boolean;
+    /** True if user can access AI agent settings (owner + admin) */
+    canManageAgents: boolean;
+    /** True if user can manage WhatsApp connections (owner + admin) */
+    canManageConnections: boolean;
     memberId: string | null;
     isLoading: boolean;
 }
@@ -40,13 +48,19 @@ export function useWorkspaceRole(): WorkspaceRole {
     });
 
     const role = (data?.role as "owner" | "admin" | "member") || null;
+    const isOwner = role === "owner";
+    const isAdmin = role === "admin" || role === "owner";
 
     return {
         role,
-        isOwner: role === "owner",
-        isAdmin: role === "admin" || role === "owner",
+        isOwner,
+        isAdmin,
         isMember: role === "member",
-        canManageTeam: role === "owner" || role === "admin",
+        canManageTeam: isOwner || role === "admin",
+        canAccessSettings: isOwner || role === "admin",
+        canManageWorkspace: isOwner,
+        canManageAgents: isOwner || role === "admin",
+        canManageConnections: isOwner || role === "admin",
         memberId: data?.id || null,
         isLoading,
     };

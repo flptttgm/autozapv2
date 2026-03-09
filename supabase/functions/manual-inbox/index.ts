@@ -63,12 +63,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { 
-      chat_id: providedChatId, 
-      message, 
-      lead_id: providedLeadId, 
-      user_id, 
-      user_name, 
+    const {
+      chat_id: providedChatId,
+      message,
+      lead_id: providedLeadId,
+      user_id,
+      user_name,
       instance_id: providedInstanceId,
       audio_base64,
       audio_duration,
@@ -80,7 +80,8 @@ serve(async (req) => {
       document_mime_type,
       document_file_name,
       document_extension,
-      document_caption
+      document_caption,
+      quoted_message_id
     } = await req.json();
 
     const normalizedAudioBase64 = typeof audio_base64 === 'string'
@@ -105,10 +106,10 @@ serve(async (req) => {
 
     let chat_id = providedChatId;
 
-    console.log('Manual message send request:', { 
-      chat_id: providedChatId, 
-      providedLeadId, 
-      message_length: message?.length || 0, 
+    console.log('Manual message send request:', {
+      chat_id: providedChatId,
+      providedLeadId,
+      message_length: message?.length || 0,
       providedInstanceId,
       hasLeadId: !!providedLeadId,
       isAudio: isAudioMessage,
@@ -141,7 +142,7 @@ serve(async (req) => {
 
     if (!lead_id || !workspace_id || !destinationPhone) {
       console.log('No lead found, attempting to find/create from chat history...');
-      
+
       const { data: existingMessages, error: msgError } = await supabase
         .from('messages')
         .select('metadata, workspace_id')
@@ -160,7 +161,7 @@ serve(async (req) => {
 
       const messageWithWorkspace = existingMessages.find(m => m.workspace_id);
       const messageWithPhone = existingMessages.find(m => m.metadata?.phone);
-      
+
       workspace_id = messageWithWorkspace?.workspace_id || null;
       const phoneFromMetadata = messageWithPhone?.metadata?.phone;
       const senderName = messageWithPhone?.metadata?.senderName || messageWithPhone?.metadata?.pushName || 'Contato via WhatsApp';
@@ -172,66 +173,86 @@ serve(async (req) => {
       }
 
       if (!phoneFromMetadata) {
-        throw new Error('Não foi possível determinar o telefone do destinatário');
-      }
+        // For groups without phone, try to get group ID from zapi_payload
+        const messageWithGroupPhone = existingMessages.find(m => m.metadata?.zapi_payload?.phone);
+        const groupPhone = messageWithGroupPhone?.metadata?.zapi_payload?.phone;
 
-      if (chat_id.includes('-group') || chat_id.includes('g.us')) {
-        throw new Error('Não é possível enviar mensagens manuais para grupos');
-      }
-
-      const { data: existingLead } = await supabase
-        .from('leads')
-        .select('id, phone')
-        .eq('workspace_id', workspace_id)
-        .eq('phone', phoneFromMetadata)
-        .maybeSingle();
-
-      if (existingLead) {
-        console.log('Found existing lead:', existingLead.id);
-        lead_id = existingLead.id;
-        destinationPhone = existingLead.phone;
-      } else {
-        console.log('Creating new lead for phone:', phoneFromMetadata);
-        const { data: newLead, error: createError } = await supabase
-          .from('leads')
-          .insert({
-            phone: phoneFromMetadata,
-            name: senderName,
-            workspace_id: workspace_id,
-            status: 'new',
-            metadata: { 
-              source: 'manual_inbox',
-              originalChatId: chat_id 
-            }
-          })
-          .select('id, phone')
-          .single();
-
-        if (createError) {
-          console.error('Error creating lead:', createError);
-          throw new Error('Erro ao criar lead automaticamente');
-        }
-
-        console.log('Created new lead:', newLead.id);
-        lead_id = newLead.id;
-        destinationPhone = newLead.phone;
-
-        const { error: updateError } = await supabase
-          .from('messages')
-          .update({ lead_id: newLead.id })
-          .eq('chat_id', chat_id)
-          .eq('workspace_id', workspace_id)
-          .is('lead_id', null);
-
-        if (updateError) {
-          console.error('Error updating messages with new lead_id:', updateError);
+        if (groupPhone) {
+          console.log('[manual-inbox] Group detected, using group phone:', groupPhone);
+          destinationPhone = groupPhone;
+          // For groups, skip lead creation - just use a null lead_id
+          lead_id = null;
         } else {
-          console.log('Updated old messages with new lead_id');
+          throw new Error('Não foi possível determinar o telefone do destinatário');
         }
+      }
+
+      // Check if this is a group chat
+      const isGroupChat = existingMessages.some(m =>
+        m.metadata?.zapi_payload?.isGroup === true ||
+        m.metadata?.isGroup === true
+      ) || chat_id.includes('-group') || chat_id.includes('g.us');
+
+      if (!isGroupChat && phoneFromMetadata) {
+        // Only do lead lookup/creation for non-group chats
+        const { data: existingLead } = await supabase
+          .from('leads')
+          .select('id, phone')
+          .eq('workspace_id', workspace_id)
+          .eq('phone', phoneFromMetadata)
+          .maybeSingle();
+
+        if (existingLead) {
+          console.log('Found existing lead:', existingLead.id);
+          lead_id = existingLead.id;
+          destinationPhone = existingLead.phone;
+        } else {
+          console.log('Creating new lead for phone:', phoneFromMetadata);
+          const { data: newLead, error: createError } = await supabase
+            .from('leads')
+            .insert({
+              phone: phoneFromMetadata,
+              name: senderName,
+              workspace_id: workspace_id,
+              status: 'new',
+              metadata: {
+                source: 'manual_inbox',
+                originalChatId: chat_id
+              }
+            })
+            .select('id, phone')
+            .single();
+
+          if (createError) {
+            console.error('Error creating lead:', createError);
+            throw new Error('Erro ao criar lead automaticamente');
+          }
+
+          console.log('Created new lead:', newLead.id);
+          lead_id = newLead.id;
+          destinationPhone = newLead.phone;
+
+          const { error: updateError } = await supabase
+            .from('messages')
+            .update({ lead_id: newLead.id })
+            .eq('chat_id', chat_id)
+            .eq('workspace_id', workspace_id)
+            .is('lead_id', null);
+
+          if (updateError) {
+            console.error('Error updating messages with new lead_id:', updateError);
+          } else {
+            console.log('Updated old messages with new lead_id');
+          }
+        }
+      } else if (isGroupChat && !destinationPhone) {
+        // For groups, try extracting group phone from zapi_payload
+        const messageWithGroupPhone = existingMessages.find(m => m.metadata?.zapi_payload?.phone);
+        destinationPhone = messageWithGroupPhone?.metadata?.zapi_payload?.phone || null;
       }
     }
 
-    if (!lead_id || !workspace_id || !destinationPhone) {
+    if (!workspace_id || !destinationPhone) {
       throw new Error('Não foi possível determinar o destinatário da mensagem');
     }
 
@@ -242,14 +263,14 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    
+
     if (existingLeadMessage?.chat_id && existingLeadMessage.chat_id !== providedChatId) {
       console.log(`[manual-inbox] Using existing chat_id: ${existingLeadMessage.chat_id} instead of ${providedChatId}`);
       chat_id = existingLeadMessage.chat_id;
     }
 
     let chatInstanceId = providedInstanceId || null;
-    
+
     if (!chatInstanceId) {
       const { data: existingMessages } = await supabase
         .from('messages')
@@ -262,11 +283,11 @@ serve(async (req) => {
 
       chatInstanceId = existingMessages?.[0]?.metadata?.instanceId || null;
     }
-    
+
     console.log('Using instanceId:', chatInstanceId);
 
     let instance;
-    
+
     if (chatInstanceId) {
       const { data: specificInstance, error: specificError } = await supabase
         .from('whatsapp_instances')
@@ -274,18 +295,18 @@ serve(async (req) => {
         .eq('workspace_id', workspace_id)
         .eq('instance_id', chatInstanceId)
         .maybeSingle();
-      
+
       if (specificError) {
         console.error('Error fetching specific WhatsApp instance:', specificError);
       }
-      
+
       instance = specificInstance;
-      
+
       if (instance && instance.status !== 'connected') {
         throw new Error('A instância do WhatsApp usada nesta conversa está desconectada. Reconecte na página Conexões.');
       }
     }
-    
+
     if (!instance) {
       const { data: fallbackInstance, error: fallbackError } = await supabase
         .from('whatsapp_instances')
@@ -295,12 +316,12 @@ serve(async (req) => {
         .order('connected_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (fallbackError) {
         console.error('Error fetching fallback WhatsApp instance:', fallbackError);
         throw new Error('Erro ao buscar instância do WhatsApp');
       }
-      
+
       instance = fallbackInstance;
     }
 
@@ -383,9 +404,9 @@ serve(async (req) => {
         storagePath: objectPath,
         audioUrl_prefix: audioUrl.slice(0, 64),
       });
-      
+
       const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-audio`;
-      
+
       const zapiResponse = await fetch(zapiUrl, {
         method: 'POST',
         headers: {
@@ -517,15 +538,15 @@ serve(async (req) => {
         imageUrl_prefix: imageUrl.slice(0, 64),
         caption: image_caption?.slice(0, 50) || '',
       });
-      
+
       const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-image`;
-      
+
       const zapiPayload: Record<string, unknown> = {
         phone: destinationPhone,
         image: imageUrl,
         delayTyping: 1
       };
-      
+
       if (image_caption && image_caption.trim()) {
         zapiPayload.caption = image_caption.trim();
       }
@@ -659,16 +680,16 @@ serve(async (req) => {
         fileName,
         caption: document_caption?.slice(0, 50) || '',
       });
-      
+
       const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-document/${ext}`;
-      
+
       const zapiPayload: Record<string, unknown> = {
         phone: destinationPhone,
         document: documentUrl,
         fileName: fileName,
         delayTyping: 1
       };
-      
+
       if (document_caption && document_caption.trim()) {
         zapiPayload.caption = document_caption.trim();
       }
@@ -753,7 +774,7 @@ serve(async (req) => {
         const part = messageParts[i];
 
         const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiInstanceToken}/send-text`;
-        
+
         const zapiResponse = await fetch(zapiUrl, {
           method: 'POST',
           headers: {
@@ -763,7 +784,8 @@ serve(async (req) => {
           body: JSON.stringify({
             phone: destinationPhone,
             message: part,
-            delayTyping: 1
+            delayTyping: 1,
+            ...(quoted_message_id && i === 0 ? { messageId: quoted_message_id } : {})
           }),
         });
 
@@ -802,7 +824,8 @@ serve(async (req) => {
               sentBy: 'user',
               userId: user_id || null,
               userName: user_name || 'Usuário',
-              instanceId: zapiInstanceId
+              instanceId: zapiInstanceId,
+              ...(quoted_message_id && i === 0 ? { quotedMessageId: quoted_message_id } : {})
             }
           });
 
@@ -819,8 +842,8 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       is_audio: isAudioMessage,
       is_image: isImageMessage,
       is_document: isDocumentMessage,

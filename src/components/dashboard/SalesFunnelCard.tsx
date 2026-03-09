@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -6,6 +6,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pencil } from "lucide-react";
+import { toast } from "sonner";
 import {
   Users,
   Search,
@@ -15,6 +17,70 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+
+const EditableMetric = ({
+  label,
+  value,
+  prefix = "",
+  onSave,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  prefix?: string;
+  onSave: (val: string) => void;
+  highlight?: boolean;
+}) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    if (draft !== value) onSave(draft);
+  };
+
+  return (
+    <div className="flex flex-col items-center sm:items-start">
+      <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">{label}</span>
+      {editing ? (
+        <div className="flex items-center gap-1">
+          {prefix && <span className="text-xl font-bold text-foreground leading-none">{prefix}</span>}
+          <input
+            ref={inputRef}
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === "Enter" && commit()}
+            className="bg-transparent border-b border-emerald-500 text-xl font-bold text-foreground leading-none outline-none w-24 text-center"
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="group flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+        >
+          <span className={cn(
+            "text-xl font-bold leading-none",
+            highlight ? "text-2xl text-emerald-600 dark:text-emerald-500" : "text-foreground"
+          )}>
+            {value ? `${prefix}${value}` : "—"}
+          </span>
+          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const SalesFunnelCard = ({ className }: { className?: string }) => {
   const { profile } = useAuth();
@@ -53,7 +119,7 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
       return [
         {
           name: "Leads captados",
-          value: counts.new,
+          value: counts.new + counts.contacted + counts.qualified + counts.proposal + counts.negotiation + counts.won,
           icon: Users,
           color: "neutral",
         },
@@ -85,6 +151,35 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
     },
     enabled: !!profile?.workspace_id,
   });
+
+  // Fetch workspace settings for editable metrics
+  const { data: workspaceSettings } = useQuery({
+    queryKey: ["workspace-settings", profile?.workspace_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("settings")
+        .eq("id", profile?.workspace_id)
+        .single();
+      if (error) throw error;
+      return (data?.settings as Record<string, string>) || {};
+    },
+    enabled: !!profile?.workspace_id,
+  });
+
+  const saveMetric = async (key: string, value: string) => {
+    const currentSettings = workspaceSettings || {};
+    const newSettings = { ...currentSettings, [key]: value };
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ settings: newSettings })
+      .eq("id", profile?.workspace_id);
+    if (error) {
+      toast.error("Erro ao salvar");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["workspace-settings"] });
+  };
 
   // Real-time subscription: auto-update funnel when any lead status changes
   useEffect(() => {
@@ -171,7 +266,7 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
             {funnelData.map((step, index) => {
               const baseValue = funnelData[0].value;
               const percentage = index === 0
-                ? "BASE 100%"
+                ? "100%"
                 : baseValue > 0
                   ? `${Math.round((step.value / baseValue) * 100)}%`
                   : "0%";
@@ -244,18 +339,22 @@ export const SalesFunnelCard = ({ className }: { className?: string }) => {
 
         {/* Footer Metrics */}
         <div className="mt-8 pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-6 px-2 sm:px-8">
-          <div className="flex flex-col items-center sm:items-start">
-            <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">CAC médio</span>
-            <span className="text-xl font-bold text-foreground leading-none">R$ 12,40</span>
-          </div>
+          <EditableMetric
+            label="CAC médio"
+            value={workspaceSettings?.cac_medio || ""}
+            prefix="R$ "
+            onSave={(val) => saveMetric("cac_medio", val)}
+          />
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">Conversão total</span>
             <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-500 leading-none">{conversionRate}%</span>
           </div>
-          <div className="flex flex-col items-center sm:items-end">
-            <span className="text-[10px] font-bold tracking-wide text-muted-foreground mb-1">Ticket médio</span>
-            <span className="text-xl font-bold text-foreground leading-none">R$ 2.450</span>
-          </div>
+          <EditableMetric
+            label="Ticket médio"
+            value={workspaceSettings?.ticket_medio || ""}
+            prefix="R$ "
+            onSave={(val) => saveMetric("ticket_medio", val)}
+          />
         </div>
       </CardContent>
     </Card>

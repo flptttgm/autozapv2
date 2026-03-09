@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, KeyboardEvent, memo } from "react";
-import { Send, Paperclip, Image, Mic, Loader2 } from "lucide-react";
+import { useState, useCallback, useRef, KeyboardEvent, ClipboardEvent, memo } from "react";
+import { Send, Paperclip, Image, Mic, Loader2, X, Reply } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -10,16 +10,30 @@ import { AudioRecorder } from "./AudioRecorder";
 import { ImagePreviewDialog } from "./ImagePreviewDialog";
 import { DocumentPreviewDialog } from "./DocumentPreviewDialog";
 
+export interface ReplyingToMessage {
+  id: string;
+  content: string | null;
+  direction: string;
+  zapi_message_id?: string | null;
+  message_type?: string;
+  metadata?: any;
+}
+
 interface MessageInputProps {
   onSend: (message: string) => void;
   onSendAudio?: (audioBase64: string, duration: number, mimeType: string) => void;
   onSendImage?: (imageBase64: string, caption: string, mimeType: string) => void;
   onSendDocument?: (base64: string, fileName: string, caption: string, mimeType: string, extension: string) => void;
+  onSendScript?: (messages: Array<{ content: string; delay?: number }>) => void;
   isPending: boolean;
   isImagePending?: boolean;
   isDocumentPending?: boolean;
   disabled?: boolean;
   quickReplies?: QuickReply[];
+  replyingTo?: ReplyingToMessage | null;
+  onCancelReply?: () => void;
+  leadName?: string;
+  leadPhone?: string;
 }
 
 /**
@@ -30,11 +44,16 @@ export const MessageInput = memo(function MessageInput({
   onSendAudio,
   onSendImage,
   onSendDocument,
+  onSendScript,
   isPending,
   isImagePending = false,
   isDocumentPending = false,
   disabled = false,
   quickReplies = [],
+  replyingTo,
+  onCancelReply,
+  leadName,
+  leadPhone,
 }: MessageInputProps) {
   const [text, setText] = useState("");
   const [isRecordingMode, setIsRecordingMode] = useState(false);
@@ -49,7 +68,8 @@ export const MessageInput = memo(function MessageInput({
     if (!text.trim() || isPending || disabled) return;
     onSend(text.trim());
     setText("");
-  }, [text, isPending, disabled, onSend]);
+    onCancelReply?.();
+  }, [text, isPending, disabled, onSend, onCancelReply]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -59,6 +79,33 @@ export const MessageInput = memo(function MessageInput({
       }
     },
     [handleSend]
+  );
+
+  const handlePaste = useCallback(
+    (e: ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind !== "file") continue;
+
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        e.preventDefault();
+
+        if (file.type.startsWith("image/") && onSendImage) {
+          setSelectedImageFile(file);
+          setImageDialogOpen(true);
+        } else if (onSendDocument) {
+          setSelectedDocumentFile(file);
+          setDocumentDialogOpen(true);
+        }
+        return;
+      }
+    },
+    [onSendImage, onSendDocument]
   );
 
   const handleEmojiSelect = useCallback((emoji: string) => {
@@ -224,12 +271,36 @@ export const MessageInput = memo(function MessageInput({
       />
 
       <div className="bg-background/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] transition-all focus-within:ring-1 focus-within:ring-primary/30">
+        {/* Reply preview banner */}
+        {replyingTo && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-b border-primary/20">
+            <Reply className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-primary">
+                {replyingTo.direction === "inbound" ? "Respondendo ao contato" : "Respondendo à sua mensagem"}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {replyingTo.message_type === "audio" ? "🎤 Áudio" :
+                  replyingTo.message_type === "image" ? "📷 Imagem" :
+                    replyingTo.message_type === "document" ? "📄 Documento" :
+                      replyingTo.content?.slice(0, 80) || "Mensagem"}
+              </p>
+            </div>
+            <button
+              onClick={onCancelReply}
+              className="shrink-0 p-1 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         {/* Text area */}
         <Textarea
           placeholder="Digite sua mensagem aqui..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           disabled={isDisabled}
           className="border-0 resize-none min-h-[60px] max-h-[120px] focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent px-4 py-3 placeholder:text-muted-foreground/60"
           rows={2}
@@ -284,7 +355,10 @@ export const MessageInput = memo(function MessageInput({
             <ShortcutsPopover
               quickReplies={quickReplies}
               onSelect={handleShortcutSelect}
+              onSendScript={onSendScript}
               disabled={isDisabled}
+              leadName={leadName}
+              leadPhone={leadPhone}
             />
           </div>
 

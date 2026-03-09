@@ -44,6 +44,7 @@ import {
   MessageSquare,
   BookOpen,
   MoreVertical,
+  Reply,
 } from "lucide-react";
 import { MessageStatusIndicator } from "@/components/conversations/MessageStatusIndicator";
 import { ContactDetailsPanel } from "@/components/conversations/ContactDetailsPanel";
@@ -79,7 +80,7 @@ import { ptBR } from "date-fns/locale";
 import { useTerminology } from "@/hooks/useTerminology";
 import { useAuth } from "@/contexts/AuthContext";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
-import { MessageInput } from "@/components/conversations/MessageInput";
+import { MessageInput, ReplyingToMessage } from "@/components/conversations/MessageInput";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppleEmojiText } from "@/components/ui/apple-emoji-text";
 import { MarkdownWithAppleEmoji } from "@/components/ui/markdown-apple-emoji";
@@ -549,6 +550,11 @@ interface ChatContentProps {
   currentAIMode?: string;
   onOpenPdfPreview?: (url: string, fileName: string) => void;
   onOpenImagePreview?: (url: string, caption: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  isDeletingMessage?: boolean;
+  replyingTo?: ReplyingToMessage | null;
+  onReplyMessage?: (msg: ReplyingToMessage) => void;
+  onCancelReply?: () => void;
 }
 
 const MemoizedChatContent = memo(function ChatContent({
@@ -584,6 +590,11 @@ const MemoizedChatContent = memo(function ChatContent({
   onToggleLeadAI,
   currentAIMode,
   onOpenImagePreview,
+  onDeleteMessage,
+  isDeletingMessage,
+  replyingTo,
+  onReplyMessage,
+  onCancelReply,
 }: ChatContentProps) {
   // Show skeleton if loading and no cached messages
   if (isLoading && (!messages || messages.length === 0)) {
@@ -1149,7 +1160,7 @@ const MemoizedChatContent = memo(function ChatContent({
                           : "justify-end"
                           }`}
                       >
-                        <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[70%]">
+                        <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[70%] group/msg relative">
                           {msg.direction !== "inbound" && (
                             <div className="flex items-center gap-1.5 justify-end px-1">
                               {msg.direction === "outbound_manual" ? (
@@ -1170,14 +1181,29 @@ const MemoizedChatContent = memo(function ChatContent({
                               )}
                             </div>
                           )}
-                          {msg.direction === "inbound" && isGroupHeader && (
-                            <div className="flex items-center gap-1.5 px-1">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                {(msg.metadata as any)?.senderName || "Cliente"}
-                              </span>
-                            </div>
-                          )}
+                          {msg.direction === "inbound" && isGroupChat && (() => {
+                            const senderName = (msg.metadata as any)?.senderName || (msg.metadata as any)?.pushName || "Participante";
+                            // Generate a consistent color from the sender name
+                            const colors = [
+                              "#3b82f6", "#10b981", "#8b5cf6",
+                              "#f97316", "#ec4899", "#06b6d4",
+                              "#f59e0b", "#f43f5e", "#14b8a6",
+                              "#6366f1"
+                            ];
+                            let hash = 0;
+                            for (let i = 0; i < senderName.length; i++) {
+                              hash = senderName.charCodeAt(i) + ((hash << 5) - hash);
+                            }
+                            const color = colors[Math.abs(hash) % colors.length];
+                            return (
+                              <div className="flex items-center gap-1.5 px-1">
+                                <User className="h-3 w-3" style={{ color }} />
+                                <span className="text-xs font-medium" style={{ color }}>
+                                  {senderName}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <Card
                             className={`rounded-2xl ${msg.message_type === "sticker"
                               ? "bg-transparent p-0 shadow-none border-none"
@@ -1346,6 +1372,48 @@ const MemoizedChatContent = memo(function ChatContent({
                                 <TranscriptionIndicator />
                               )}
                           </Card>
+                          {/* Delete message button - outbound only */}
+                          {msg.direction !== "inbound" && onDeleteMessage && (
+                            <div className="flex justify-end">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm("Apagar esta mensagem para todos?")) {
+                                    onDeleteMessage(msg.id);
+                                  }
+                                }}
+                                disabled={isDeletingMessage}
+                                className="opacity-0 group-hover/msg:opacity-100 transition-opacity duration-200 text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-destructive/10 text-xs flex items-center gap-1"
+                                title="Apagar mensagem"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Apagar</span>
+                              </button>
+                            </div>
+                          )}
+                          {/* Reply button - all messages */}
+                          {onReplyMessage && msg.zapi_message_id && (
+                            <div className={`flex ${msg.direction === "inbound" ? "justify-start" : "justify-end"}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReplyMessage({
+                                    id: msg.id,
+                                    content: msg.content,
+                                    direction: msg.direction,
+                                    zapi_message_id: msg.zapi_message_id,
+                                    message_type: msg.message_type,
+                                    metadata: msg.metadata,
+                                  });
+                                }}
+                                className="opacity-0 group-hover/msg:opacity-100 transition-opacity duration-200 text-muted-foreground hover:text-primary p-1 rounded-md hover:bg-primary/10 text-xs flex items-center gap-1"
+                                title="Responder"
+                              >
+                                <Reply className="h-3 w-3" />
+                                <span>Responder</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1404,23 +1472,27 @@ const MemoizedChatContent = memo(function ChatContent({
 
         {/* Input */}
         <div className="p-3 sm:p-4 border-t border-border/40 bg-transparent">
-          {isGroupChat ? (
-            <div className="flex items-center justify-center text-muted-foreground text-sm py-3">
-              <Users className="h-4 w-4 mr-2" />
-              Respostas manuais para grupos não são suportadas
-            </div>
-          ) : (
-            <MessageInput
-              onSend={handleSendMessage}
-              onSendAudio={handleSendAudio}
-              onSendImage={handleSendImage}
-              onSendDocument={handleSendDocument}
-              isPending={false}
-              isImagePending={false}
-              isDocumentPending={false}
-              quickReplies={quickReplies}
-            />
-          )}
+          <MessageInput
+            onSend={handleSendMessage}
+            onSendAudio={handleSendAudio}
+            onSendImage={handleSendImage}
+            onSendDocument={handleSendDocument}
+            onSendScript={(msgs) => {
+              msgs.forEach((msg, i) => {
+                setTimeout(() => {
+                  handleSendMessage(msg.content);
+                }, i * (msg.delay || 2) * 1000);
+              });
+            }}
+            isPending={false}
+            isImagePending={false}
+            isDocumentPending={false}
+            quickReplies={quickReplies}
+            replyingTo={replyingTo}
+            onCancelReply={onCancelReply}
+            leadName={chatHeader?.leads?.name || undefined}
+            leadPhone={chatHeader?.leads?.phone || undefined}
+          />
         </div>
       </motion.div>
     </div>
@@ -1440,6 +1512,7 @@ const Conversations = () => {
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [newConversationOpen, setNewConversationOpen] = useState(false);
   const [isAITyping, setIsAITyping] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ReplyingToMessage | null>(null);
 
   // Listen for header "new conversation" button
   useEffect(() => {
@@ -1851,13 +1924,39 @@ const Conversations = () => {
       // Group by lead_id (preferred) or chat_id (fallback for messages without lead)
       // This prevents duplicate conversations when the same lead has messages with different chat_id formats
       const chatMap = new Map<string, any>();
+      // Reverse lookup: chat_id → groupKey that owns it, to merge orphan messages (lead_id=null)
+      const chatIdToGroupKey = new Map<string, string>();
 
       data.forEach((msg: any) => {
         const chatId = msg.chat_id;
         const leadId = msg.lead_id;
         const meta = msg.metadata as any;
-        // Use lead_id as the primary grouping key when available, fallback to chat_id
-        const groupKey = leadId || chatId;
+
+        // Determine the groupKey:
+        // 1. If lead_id exists, group by lead_id
+        // 2. If no lead_id, check if this chat_id already belongs to an existing group (reverse lookup)
+        // 3. Fallback to chat_id as the group key
+        let groupKey: string;
+        if (leadId) {
+          groupKey = leadId;
+          // Edge case: a previous message (without lead_id) already created a group keyed by chatId.
+          // We need to merge that orphan group into this lead-based group.
+          if (!chatMap.has(groupKey) && chatMap.has(chatId)) {
+            const orphanEntry = chatMap.get(chatId);
+            // Re-key the orphan entry under the leadId
+            chatMap.set(groupKey, orphanEntry);
+            chatMap.delete(chatId);
+            // Update the reverse lookup for all chat_ids that pointed to the old key
+            for (const cid of orphanEntry._allChatIds) {
+              chatIdToGroupKey.set(cid, groupKey);
+            }
+          }
+        } else if (chatIdToGroupKey.has(chatId)) {
+          // This chat_id is already tracked by another group (e.g. a lead-based group)
+          groupKey = chatIdToGroupKey.get(chatId)!;
+        } else {
+          groupKey = chatId;
+        }
 
         if (chatMap.has(groupKey)) {
           // Only update missing instanceId/groupName
@@ -1868,13 +1967,20 @@ const Conversations = () => {
           if (!existing.groupName && meta?.groupName) {
             existing.groupName = meta.groupName;
           }
+          // Backfill lead data if the existing entry is missing it
+          if (!existing.leads && msg.leads) {
+            existing.leads = msg.leads;
+          }
+          if (!existing.lead_id && leadId) {
+            existing.lead_id = leadId;
+          }
           // Track all chat_ids for this lead (for unread count aggregation)
           if (chatId && !existing._allChatIds.has(chatId)) {
             existing._allChatIds.add(chatId);
           }
         } else {
           // First message for this chat (already the most recent due to ORDER BY)
-          const isGroup = chatId?.includes("-group") || meta?.isGroup === true;
+          const isGroup = chatId?.includes("-group") || meta?.isGroup === true || meta?.zapi_payload?.isGroup === true;
           chatMap.set(groupKey, {
             chat_id: chatId,
             lead_id: leadId,
@@ -1882,7 +1988,7 @@ const Conversations = () => {
             leads: msg.leads,
             instanceId: meta?.instanceId || null,
             isGroup,
-            groupName: meta?.groupName || null,
+            groupName: meta?.groupName || meta?.zapi_payload?.chatName || null,
             lastMessage: {
               content: msg.content,
               direction: msg.direction,
@@ -1892,6 +1998,12 @@ const Conversations = () => {
             },
             _allChatIds: new Set([chatId]),
           });
+        }
+
+        // Always register the reverse lookup so future messages with the same chat_id
+        // but no lead_id will merge into this group
+        if (chatId && !chatIdToGroupKey.has(chatId)) {
+          chatIdToGroupKey.set(chatId, groupKey);
         }
       });
 
@@ -1936,6 +2048,23 @@ const Conversations = () => {
       ? chats.filter((chat) => chat.instanceId === selectedInstance)
       : chats;
 
+    // ── Folder access enforcement for non-admin members ──
+    // When a member has folder restrictions and no specific folder is selected,
+    // only show conversations whose lead belongs to one of the allowed folders.
+    if (allowedChatFolderIds !== null && selectedChatFolderId === null && leadFolderRelations) {
+      if (allowedChatFolderIds.length === 0) {
+        // No folders assigned — show nothing
+        result = [];
+      } else {
+        const allowedLeadIds = new Set(
+          leadFolderRelations
+            .filter((r: any) => allowedChatFolderIds.includes(r.folder_id))
+            .map((r: any) => r.lead_id)
+        );
+        result = result.filter((chat) => chat.lead_id && allowedLeadIds.has(chat.lead_id));
+      }
+    }
+
     // Apply lead folder filter — show conversations whose lead belongs to the selected folder
     if (selectedChatFolderId !== null && leadFolderRelations) {
       const leadsInFolder = new Set(
@@ -1973,7 +2102,7 @@ const Conversations = () => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     });
-  }, [chats, selectedInstance, searchTerm, activeFilter, selectedChatFolderId, leadFolderRelations]);
+  }, [chats, selectedInstance, searchTerm, activeFilter, selectedChatFolderId, leadFolderRelations, allowedChatFolderIds]);
 
   // Fetch messages with loading state
   const { data: messages, isLoading: messagesLoading } = useQuery({
@@ -2356,18 +2485,10 @@ const Conversations = () => {
 
       const selectedChat = chats?.find((c) => c.chat_id === selectedChatId);
 
-      // Verificar se é grupo usando isGroup flag ou padrão do chat_id
-      const isGroup =
-        selectedChat?.isGroup === true ||
-        selectedChat?.chat_id?.includes("-group") === true;
-      if (isGroup) {
-        throw new Error("Não é possível enviar mensagens manuais para grupos");
-      }
-
       console.log("[Conversations] Sending message:", {
         chat_id: selectedChatId,
         lead_id: selectedChat?.lead_id,
-        isGroup,
+        isGroup: selectedChat?.isGroup,
         hasLeadId: !!selectedChat?.lead_id,
       });
 
@@ -2375,9 +2496,10 @@ const Conversations = () => {
         body: {
           chat_id: selectedChatId,
           message: messageToSend,
-          lead_id: selectedChat?.lead_id || null, // Pode ser null, a edge function vai criar
+          lead_id: selectedChat?.lead_id || null,
           user_id: user?.id,
           user_name: profile?.display_name || user?.email || "Usuário",
+          ...(replyingTo?.zapi_message_id ? { quoted_message_id: replyingTo.zapi_message_id } : {}),
         },
       });
 
@@ -2409,11 +2531,11 @@ const Conversations = () => {
           id: `temp-${Date.now()}`,
           chat_id: selectedChatId,
           content: messageToSend,
-          direction: "outbound",
+          direction: "outbound_manual",
           message_type: "text",
           created_at: new Date().toISOString(),
           delivery_status: "pending",
-          metadata: {}
+          metadata: { userName: profile?.display_name || "Usuário" }
         }];
       });
       return { previousMessages };
@@ -2448,14 +2570,6 @@ const Conversations = () => {
       if (!selectedChatId) return;
 
       const selectedChat = chats?.find((c) => c.chat_id === selectedChatId);
-
-      // Verificar se é grupo
-      const isGroup =
-        selectedChat?.isGroup === true ||
-        selectedChat?.chat_id?.includes("-group") === true;
-      if (isGroup) {
-        throw new Error("Não é possível enviar áudio para grupos");
-      }
 
       console.log("[Conversations] Sending audio:", {
         chat_id: selectedChatId,
@@ -2541,14 +2655,6 @@ const Conversations = () => {
       if (!selectedChatId) return;
 
       const selectedChat = chats?.find((c) => c.chat_id === selectedChatId);
-
-      // Verificar se é grupo
-      const isGroup =
-        selectedChat?.isGroup === true ||
-        selectedChat?.chat_id?.includes("-group") === true;
-      if (isGroup) {
-        throw new Error("Não é possível enviar imagem para grupos");
-      }
 
       console.log("[Conversations] Sending image:", {
         chat_id: selectedChatId,
@@ -2637,14 +2743,6 @@ const Conversations = () => {
       if (!selectedChatId) return;
 
       const selectedChat = chats?.find((c) => c.chat_id === selectedChatId);
-
-      // Verificar se é grupo
-      const isGroup =
-        selectedChat?.isGroup === true ||
-        selectedChat?.chat_id?.includes("-group") === true;
-      if (isGroup) {
-        throw new Error("Não é possível enviar documento para grupos");
-      }
 
       console.log("[Conversations] Sending document:", {
         chat_id: selectedChatId,
@@ -2755,6 +2853,55 @@ const Conversations = () => {
     onError: (error: Error) => {
       toast.error("Erro ao excluir conversa: " + error.message);
       setChatToDelete(null);
+    },
+  });
+
+  // Delete individual message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { data, error } = await supabase.functions.invoke("delete-message", {
+        body: { message_id: messageId },
+      });
+      if (error) {
+        let errorMessage = "Erro desconhecido";
+        try {
+          if (error.context) {
+            const errorBody = await error.context.json();
+            errorMessage = errorBody.error || error.message || errorMessage;
+          } else {
+            errorMessage = (data as any)?.error || error.message || errorMessage;
+          }
+        } catch (e) {
+          errorMessage = error.message || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      return data;
+    },
+    onMutate: async (messageId) => {
+      const queryKey = ["messages", selectedChatId, profile?.workspace_id];
+      await queryClient.cancelQueries({ queryKey });
+      const previousMessages = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        return old.filter((m: any) => m.id !== messageId);
+      });
+      return { previousMessages };
+    },
+    onSuccess: () => {
+      toast.success("Mensagem apagada para todos!");
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    },
+    onError: (error, _, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          ["messages", selectedChatId, profile?.workspace_id],
+          context.previousMessages
+        );
+      }
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao apagar mensagem"
+      );
     },
   });
 
@@ -2912,13 +3059,7 @@ const Conversations = () => {
     selectedChat?.isGroup === true ||
     selectedChat?.chat_id?.includes("-group") === true;
 
-  console.log("[Conversations] isGroupChat check:", {
-    chatId: selectedChat?.chat_id,
-    isGroup: selectedChat?.isGroup,
-    hasGroupInId: selectedChat?.chat_id?.includes("-group"),
-    leadId: selectedChat?.lead_id,
-    result: isGroupChat,
-  });
+  console.log(`[Conversations] isGroupChat = ${isGroupChat} | chatId = ${selectedChat?.chat_id} | isGroup = ${selectedChat?.isGroup} | hasGroupInId = ${selectedChat?.chat_id?.includes("-group")}`);
 
   const handleSendMessage = useCallback(
     (message: string) => {
@@ -2926,6 +3067,11 @@ const Conversations = () => {
     },
     [sendMessageMutation],
   );
+
+  // Clear replyingTo when chat changes
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [selectedChatId]);
 
   // Note: isMobile is now always a boolean (never undefined) due to sync initialization
 
@@ -2998,6 +3144,11 @@ const Conversations = () => {
                 toggleLeadAIMutation.mutate({ leadId, currentValue })
               }
               currentAIMode={currentAIMode}
+              onDeleteMessage={(messageId) => deleteMessageMutation.mutate(messageId)}
+              isDeletingMessage={deleteMessageMutation.isPending}
+              replyingTo={replyingTo}
+              onReplyMessage={setReplyingTo}
+              onCancelReply={() => setReplyingTo(null)}
             />
           </div>
         ) : (
@@ -3156,6 +3307,11 @@ const Conversations = () => {
                 toggleLeadAIMutation.mutate({ leadId, currentValue })
               }
               currentAIMode={currentAIMode}
+              onDeleteMessage={(messageId) => deleteMessageMutation.mutate(messageId)}
+              isDeletingMessage={deleteMessageMutation.isPending}
+              replyingTo={replyingTo}
+              onReplyMessage={setReplyingTo}
+              onCancelReply={() => setReplyingTo(null)}
             />
           </ResizablePanel>
 

@@ -10,6 +10,7 @@ export interface UserWorkspace {
     avatar_url: string | null;
     role: "owner" | "admin" | "member";
     template: string | null;
+    customIcon: string | null;
 }
 
 export function useUserWorkspaces() {
@@ -50,12 +51,13 @@ export function useUserWorkspaces() {
                 console.error("[WorkspaceSwitcher] Error fetching workspaces:", wsError);
             }
 
-            const wsMap = new Map<string, { name: string; template: string | null }>();
+            const wsMap = new Map<string, { name: string; template: string | null; customIcon: string | null }>();
             if (workspaceData) {
                 workspaceData.forEach((ws: any) => {
                     wsMap.set(ws.id, {
                         name: ws.name || "Sem nome",
                         template: ws.settings?.template || null,
+                        customIcon: ws.settings?.customIcon || null,
                     });
                 });
             }
@@ -85,6 +87,7 @@ export function useUserWorkspaces() {
                     avatar_url: wp?.avatar_url || null,
                     role: m.role as "owner" | "admin" | "member",
                     template: ws?.template || null,
+                    customIcon: ws?.customIcon || null,
                 };
             });
         },
@@ -93,7 +96,7 @@ export function useUserWorkspaces() {
     });
 
     const switchWorkspaceMutation = useMutation({
-        mutationFn: async (workspaceId: string) => {
+        mutationFn: async ({ workspaceId }: { workspaceId: string; redirectTo?: string }) => {
             if (!user?.id) throw new Error("User not authenticated");
 
             // Update profile's active workspace
@@ -105,7 +108,7 @@ export function useUserWorkspaces() {
             if (error) throw error;
             return workspaceId;
         },
-        onSuccess: async (workspaceId) => {
+        onSuccess: async (workspaceId, variables) => {
             const targetWorkspace = workspaces?.find((w) => w.id === workspaceId);
 
             // Refresh auth context
@@ -118,7 +121,7 @@ export function useUserWorkspaces() {
                 `Workspace alterado para ${targetWorkspace?.name || "novo workspace"}`
             );
 
-            navigate("/dashboard");
+            navigate(variables.redirectTo || "/dashboard");
         },
         onError: (error: Error) => {
             console.error("Error switching workspace:", error);
@@ -140,6 +143,7 @@ export function useUserWorkspaces() {
                 avatar_url: null,
                 role: "owner",
                 template: null,
+                customIcon: null,
             }
             : null;
 
@@ -147,7 +151,8 @@ export function useUserWorkspaces() {
         workspaces: workspaces || [],
         activeWorkspace: activeWorkspace || fallbackWorkspace,
         isLoading,
-        switchWorkspace: switchWorkspaceMutation.mutate,
+        switchWorkspace: (workspaceId: string, redirectTo?: string) =>
+            switchWorkspaceMutation.mutate({ workspaceId, redirectTo }),
         isSwitching: switchWorkspaceMutation.isPending,
     };
 }

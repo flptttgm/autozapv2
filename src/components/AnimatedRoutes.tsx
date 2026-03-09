@@ -1,5 +1,5 @@
-import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { Routes, Route } from "react-router-dom";
+
 import { lazy, Suspense } from "react";
 import { PageTransition } from "./PageTransition";
 import Layout from "./Layout";
@@ -7,7 +7,7 @@ import { ProtectedRoute } from "./ProtectedRoute";
 import { AdminProtectedRoute } from "./admin/AdminProtectedRoute";
 import { SellerProtectedRoute } from "./seller/SellerProtectedRoute";
 import { PageSkeleton, DashboardSkeleton } from "./PageSkeleton";
-import { useIsMobile } from "@/hooks/use-mobile";
+
 
 // Critical pages - Auth only (Landing now lazy loaded for performance)
 import Auth from "@/pages/Auth";
@@ -89,12 +89,8 @@ export const routePreloaders: Record<string, () => Promise<any>> = {
 };
 
 export const AnimatedRoutes = () => {
-  const location = useLocation();
-  const isMobile = useIsMobile();
-
-  // Mobile: use popLayout for instant transitions, Desktop: use wait for smoother animations
   const routesContent = (
-    <Routes location={location} key={location.pathname}>
+    <Routes>
       {/* Landing - nova versão leve focada em conversão */}
       <Route
         path="/"
@@ -692,15 +688,8 @@ export const AnimatedRoutes = () => {
     </Routes>
   );
 
-  // Mobile: no AnimatePresence to prevent component overlap issues (blank pages)
-  // Desktop: use wait mode for smoother sequential animations
-  if (isMobile) {
-    return routesContent;
-  }
-
-  return (
-    <AnimatePresence mode="wait">
-      {routesContent}
-    </AnimatePresence>
-  );
+  // AnimatePresence removed - it was causing pages to not load when combined
+  // with key on Routes. Individual PageTransition components handle their own
+  // enter animations (fade-in) which is sufficient for smooth page transitions.
+  return routesContent;
 };

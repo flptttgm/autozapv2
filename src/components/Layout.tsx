@@ -1,12 +1,13 @@
 import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, X, PanelLeftClose, Building2 } from "lucide-react";
+import { LayoutGrid, Link2, Settings, LogOut, Users, MessageSquareText, Share2, FileText, Receipt, X, PanelLeftClose, Building2, ChevronUp } from "lucide-react";
 import { MdSupportAgent, MdCast, MdCastConnected, MdDashboard, MdOutlineAppRegistration } from "react-icons/md";
 import { HiOutlineGift } from "react-icons/hi";
 import { RiRobot2Fill } from "react-icons/ri";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { PlanBadge } from "@/components/subscription/PlanBadge";
 
@@ -30,6 +31,7 @@ import { useUserWorkspaces } from "@/hooks/useUserWorkspaces";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { getWorkspaceTemplate } from "@/lib/workspaceTemplates";
 import { useTranslation } from "react-i18next";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 
 interface LayoutProps {
   children: ReactNode;
@@ -47,6 +49,7 @@ const Layout = ({ children }: LayoutProps) => {
   const activeTemplate = getWorkspaceTemplate(activeWorkspace?.template);
   const templateItems = activeTemplate.sidebarItems;
   const { connectedCount } = useConnectedWhatsAppInstances(activeWorkspace?.id);
+  const { canManageAgents, canManageConnections, canManageWorkspace } = useWorkspaceRole();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar-collapsed') === 'true';
@@ -66,6 +69,7 @@ const Layout = ({ children }: LayoutProps) => {
     return false;
   });
   const [supportChatOpen, setSupportChatOpen] = useState(false);
+  const [supportSectionOpen, setSupportSectionOpen] = useState(false);
 
   // Persist AI chat state
   useEffect(() => {
@@ -106,17 +110,50 @@ const Layout = ({ children }: LayoutProps) => {
     }
   };
 
-  // Navigation grouped for visual structure
+  // ─── Custom workspace pages config ─────────────────────────
+  const { data: customPagesConfig } = useQuery({
+    queryKey: ["custom-workspace-pages", activeWorkspace?.id],
+    queryFn: async () => {
+      if (!activeWorkspace?.id) return null;
+      const { data } = await supabase
+        .from("system_config")
+        .select("config_value")
+        .eq("workspace_id", activeWorkspace.id)
+        .eq("config_key", "custom_workspace_pages")
+        .maybeSingle();
+      return (data?.config_value as Record<string, boolean>) || null;
+    },
+    enabled: !!activeWorkspace?.id && activeWorkspace?.template === "custom",
+  });
+
   const primaryNav = [
-    { name: t("sidebar.dashboard"), href: "/dashboard", icon: MdDashboard },
-    { name: t("sidebar.workspaces"), href: "/workspaces", icon: MdOutlineAppRegistration },
+    // For custom workspaces, use customPagesConfig. For principal, always show dashboard.
+    ...(activeWorkspace?.template === "custom"
+      ? (customPagesConfig && !customPagesConfig.dashboard ? [] : [{ name: t("sidebar.dashboard"), href: "/dashboard", icon: MdDashboard }])
+      : [{ name: t("sidebar.dashboard"), href: "/dashboard", icon: MdDashboard }]),
+    ...(canManageWorkspace ? [{ name: t("sidebar.workspaces"), href: "/workspaces", icon: MdOutlineAppRegistration }] : []),
   ];
 
-  const toolsNav = [
-    { name: t("sidebar.toolsConnections"), href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast },
-  ];
+  // For custom workspaces, bypass role check if page is enabled in config
+  const isCustomWithConfig = activeWorkspace?.template === "custom" && customPagesConfig;
 
-  const agentsNav = { name: t("sidebar.agents"), href: "/ai-settings", icon: RiRobot2Fill };
+  // Custom workspace: customPagesConfig overrides role permission
+  // Principal workspace: always use role-based permission (essential pages)
+  const showConnections = isCustomWithConfig
+    ? !!customPagesConfig?.whatsapp
+    : canManageConnections;
+
+  const toolsNav = showConnections
+    ? [{ name: t("sidebar.toolsConnections"), href: "/whatsapp", icon: connectedCount > 0 ? MdCastConnected : MdCast }]
+    : [];
+
+  const showAgents = isCustomWithConfig
+    ? !!customPagesConfig?.agents
+    : canManageAgents;
+
+  const agentsNav = showAgents
+    ? { name: t("sidebar.agents"), href: "/ai-settings", icon: RiRobot2Fill }
+    : null;
 
   const systemNav = [
     { name: t("sidebar.settings"), href: "/settings", icon: Settings },
@@ -266,8 +303,8 @@ const Layout = ({ children }: LayoutProps) => {
                   sidebarCollapsed ? "lg:px-3 lg:scrollbar-hide" : "px-3",
                   "px-3"
                 )}>
-                  {/* Primary Navigation: Dashboard + Workspaces (only on principal workspace) */}
-                  {!activeWorkspace?.template && primaryNav.map(renderNavItem)}
+                  {/* Primary Navigation: Dashboard + Workspaces (only on principal or custom workspace) */}
+                  {(!activeWorkspace?.template || activeWorkspace.template === "custom") && primaryNav.map(renderNavItem)}
 
                   {/* Template-specific items */}
                   {templateItems.length > 0 && (
@@ -288,120 +325,150 @@ const Layout = ({ children }: LayoutProps) => {
                   )}
 
                   {/* Separator */}
-                  {templateItems.length > 0 && !sidebarCollapsed && (
+                  {templateItems.length > 0 && (!activeWorkspace?.template || activeWorkspace.template === "custom") && !sidebarCollapsed && (
                     <div className="pt-3 pb-1 px-1">
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                         {t("sidebar.general")}
                       </span>
                     </div>
                   )}
-                  {templateItems.length > 0 && sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+                  {templateItems.length > 0 && (!activeWorkspace?.template || activeWorkspace.template === "custom") && sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
 
-                  {/* Agentes - logo após Dashboard */}
-                  {renderNavItem(agentsNav)}
+                  {/* Main content items — only on principal (null) or custom workspace */}
+                  {(!activeWorkspace?.template || activeWorkspace.template === "custom") && (
+                    <>
+                      {/* Agentes - logo após Dashboard (admins/owners only) */}
+                      {agentsNav && (!customPagesConfig || customPagesConfig.agents !== false) && renderNavItem(agentsNav)}
 
-                  {/* Leads with dropdown - force expanded on mobile overlay */}
-                  <LeadsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+                      {/* Leads with dropdown - force expanded on mobile overlay */}
+                      {(!customPagesConfig || customPagesConfig.leads !== false) && (
+                        <LeadsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+                      )}
 
-                  {/* Conversations with dropdown - force expanded on mobile overlay */}
-                  <ConversationsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+                      {/* Conversations with dropdown - force expanded on mobile overlay */}
+                      {(!customPagesConfig || customPagesConfig.conversations !== false) && (
+                        <ConversationsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />
+                      )}
 
-                  {/* Appointments with dropdown - force expanded on mobile overlay */}
-                  {isAppointmentsVisible && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
+                      {/* Appointments with dropdown - force expanded on mobile overlay */}
+                      {isAppointmentsVisible && (!customPagesConfig || customPagesConfig.appointments !== false) && <AppointmentsSidebarItem collapsed={isMobile ? false : sidebarCollapsed} />}
 
-                  {/* Orçamentos */}
-                  {isQuotesVisible && renderNavItem({ name: t("sidebar.quotes"), href: "/quotes", icon: FileText })}
+                      {/* Orçamentos */}
+                      {isQuotesVisible && (!customPagesConfig || customPagesConfig.quotes !== false) && renderNavItem({ name: t("sidebar.quotes"), href: "/quotes", icon: FileText })}
 
-                  {/* Cobranças */}
-                  {isInvoicesVisible && renderNavItem({ name: t("sidebar.invoices"), href: "/invoices", icon: Receipt })}
+                      {/* Cobranças */}
+                      {isInvoicesVisible && (!customPagesConfig || customPagesConfig.invoices !== false) && renderNavItem({ name: t("sidebar.invoices"), href: "/invoices", icon: Receipt })}
 
-                  {/* Tools Navigation: Conexões WhatsApp */}
-                  {toolsNav.map(renderNavItem)}
+                      {/* Tools Navigation: Conexões WhatsApp */}
+                      {(!customPagesConfig || customPagesConfig.whatsapp !== false) && toolsNav.map(renderNavItem)}
+                    </>
+                  )}
 
                   {/* Separator: SUPORTE E AJUSTES */}
-                  {!sidebarCollapsed && (
-                    <div className="pt-4 pb-1 px-1">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        {t("sidebar.supportAndAdjustments")}
-                      </span>
-                    </div>
-                  )}
-                  {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
+                  {(() => {
+                    const showItems = supportSectionOpen;
 
-                  {/* Support Button */}
-                  {sidebarCollapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => {
-                            setSidebarOpen(false);
-                            setSupportChatOpen(!supportChatOpen);
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
-                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                            "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                          )}
-                        >
-                          <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">{t("sidebar.support")}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">{t("sidebar.support")}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSidebarOpen(false);
-                        setSupportChatOpen(!supportChatOpen);
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
-                        "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                      )}
-                    >
-                      <MdSupportAgent className="h-5 w-5 shrink-0" />
-                      <span>{t("sidebar.support")}</span>
-                    </button>
-                  )}
+                    return (
+                      <>
+                        {/* Section header — collapsible toggle */}
+                        {!sidebarCollapsed && (
+                          <button
+                            onClick={() => setSupportSectionOpen(!supportSectionOpen)}
+                            className="flex items-center justify-between w-full pt-4 pb-1 px-1 group"
+                          >
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                              {t("sidebar.supportAndAdjustments")}
+                            </span>
+                            <ChevronUp className={cn(
+                              "h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200 group-hover:text-muted-foreground",
+                              supportSectionOpen && "rotate-180"
+                            )} />
+                          </button>
+                        )}
+                        {sidebarCollapsed && <div className="hidden lg:block border-t border-border mx-0 my-1" />}
 
-                  {/* Indicações Link */}
-                  {sidebarCollapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Link
-                          to="/indicacao"
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
-                            "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
-                            location.pathname === "/indicacao"
-                              ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                              : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                          )}
-                        >
-                          <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
-                          <span className="lg:hidden">{t("sidebar.referrals")}</span>
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="hidden lg:block">{t("sidebar.referrals")}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <Link
-                      to="/indicacao"
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                        location.pathname === "/indicacao"
-                          ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
-                          : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
-                      )}
-                    >
-                      <HiOutlineGift className="h-5 w-5 shrink-0" />
-                      <span>{t("sidebar.referrals")}</span>
-                    </Link>
-                  )}
+                        {/* Items — always shown on main/custom, collapsible on template */}
+                        {showItems && (
+                          <>
+                            {/* Support Button */}
+                            {sidebarCollapsed ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => {
+                                      setSidebarOpen(false);
+                                      setSupportChatOpen(!supportChatOpen);
+                                    }}
+                                    className={cn(
+                                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full group",
+                                      "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                                      "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                                    )}
+                                  >
+                                    <MdSupportAgent className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                                    <span className="lg:hidden">{t("sidebar.support")}</span>
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="hidden lg:block">{t("sidebar.support")}</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setSidebarOpen(false);
+                                  setSupportChatOpen(!supportChatOpen);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                                  "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                                )}
+                              >
+                                <MdSupportAgent className="h-5 w-5 shrink-0" />
+                                <span>{t("sidebar.support")}</span>
+                              </button>
+                            )}
 
-                  {/* Configurações */}
-                  {systemNav.map(renderNavItem)}
+                            {/* Indicações Link */}
+                            {sidebarCollapsed ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    to="/indicacao"
+                                    className={cn(
+                                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors group",
+                                      "lg:justify-center lg:w-14 lg:h-14 lg:mx-auto lg:p-0",
+                                      location.pathname === "/indicacao"
+                                        ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                        : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                                    )}
+                                  >
+                                    <HiOutlineGift className="h-5 w-5 lg:h-6 lg:w-6 shrink-0 transition-transform duration-200 lg:group-hover:scale-110" />
+                                    <span className="lg:hidden">{t("sidebar.referrals")}</span>
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="hidden lg:block">{t("sidebar.referrals")}</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Link
+                                to="/indicacao"
+                                className={cn(
+                                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                                  location.pathname === "/indicacao"
+                                    ? "bg-primary text-primary-foreground dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                    : "text-muted-foreground hover:bg-accent/80 hover:text-accent-foreground dark:hover:bg-card/40 dark:hover:text-foreground"
+                                )}
+                              >
+                                <HiOutlineGift className="h-5 w-5 shrink-0" />
+                                <span>{t("sidebar.referrals")}</span>
+                              </Link>
+                            )}
+
+                            {/* Configurações */}
+                            {systemNav.map(renderNavItem)}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Bottom spacer inside nav */}
                   <div className="pb-2" />
@@ -505,6 +572,7 @@ const Layout = ({ children }: LayoutProps) => {
               appointments: isAppointmentsVisible,
               quotes: isQuotesVisible
             }}
+            canManageConnections={canManageConnections}
           />
 
           {/* Support Chat Sidebar */}

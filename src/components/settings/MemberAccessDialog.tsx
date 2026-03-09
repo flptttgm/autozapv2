@@ -13,7 +13,7 @@ import {
     DialogFooter,
     DialogClose,
 } from "@/components/ui/dialog";
-import { Folder, MessageSquare, Loader2, Shield } from "lucide-react";
+import { Folder, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 interface MemberAccessDialogProps {
@@ -56,22 +56,6 @@ export function MemberAccessDialog({
         enabled: !!profile?.workspace_id && open,
     });
 
-    // Fetch chat folders
-    const { data: chatFolders = [] } = useQuery({
-        queryKey: ["chat-folders", profile?.workspace_id],
-        queryFn: async () => {
-            if (!profile?.workspace_id) return [];
-            const { data, error } = await supabase
-                .from("chat_folders" as any)
-                .select("id, name, color")
-                .eq("workspace_id", profile.workspace_id)
-                .order("name");
-            if (error) throw error;
-            return (data as unknown as FolderItem[]) || [];
-        },
-        enabled: !!profile?.workspace_id && open,
-    });
-
     // Fetch current lead folder access
     const { data: currentLeadAccess = [] } = useQuery({
         queryKey: ["member-lead-access", member.id],
@@ -86,28 +70,12 @@ export function MemberAccessDialog({
         enabled: !!member.id && open,
     });
 
-    // Fetch current chat folder access
-    const { data: currentChatAccess = [] } = useQuery({
-        queryKey: ["member-chat-access", member.id],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from("member_chat_folder_access" as any)
-                .select("folder_id")
-                .eq("member_id", member.id);
-            if (error) throw error;
-            return (data as any[])?.map((d: any) => d.folder_id as string) || [];
-        },
-        enabled: !!member.id && open,
-    });
-
     const [leadSelections, setLeadSelections] = useState<Set<string>>(new Set());
-    const [chatSelections, setChatSelections] = useState<Set<string>>(new Set());
     const [initialized, setInitialized] = useState(false);
 
     // Sync from server data to local state when data arrives
-    if (open && !initialized && currentLeadAccess.length >= 0 && currentChatAccess.length >= 0) {
+    if (open && !initialized && currentLeadAccess.length >= 0) {
         setLeadSelections(new Set(currentLeadAccess));
-        setChatSelections(new Set(currentChatAccess));
         setInitialized(true);
     }
 
@@ -129,16 +97,6 @@ export function MemberAccessDialog({
         setLeadSelections(next);
     };
 
-    const toggleChatFolder = (folderId: string) => {
-        const next = new Set(chatSelections);
-        if (next.has(folderId)) {
-            next.delete(folderId);
-        } else {
-            next.add(folderId);
-        }
-        setChatSelections(next);
-    };
-
     const saveMutation = useMutation({
         mutationFn: async () => {
             // Save lead folder access
@@ -158,29 +116,10 @@ export function MemberAccessDialog({
                     .insert(rows);
                 if (error) throw error;
             }
-
-            // Save chat folder access
-            await supabase
-                .from("member_chat_folder_access" as any)
-                .delete()
-                .eq("member_id", member.id);
-
-            if (chatSelections.size > 0) {
-                const rows = Array.from(chatSelections).map((folder_id) => ({
-                    member_id: member.id,
-                    folder_id,
-                }));
-                const { error } = await supabase
-                    .from("member_chat_folder_access" as any)
-                    .insert(rows);
-                if (error) throw error;
-            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["member-lead-access"] });
-            queryClient.invalidateQueries({ queryKey: ["member-chat-access"] });
             queryClient.invalidateQueries({ queryKey: ["member-lead-folder-access"] });
-            queryClient.invalidateQueries({ queryKey: ["member-chat-folder-access"] });
             toast.success(`Acessos de ${member.name} atualizados!`);
             handleOpenChange(false);
         },
@@ -245,42 +184,8 @@ export function MemberAccessDialog({
                             )}
                         </div>
 
-                        {/* Chat Folders Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <MessageSquare className="h-4 w-4 text-primary" />
-                                <h4 className="font-semibold text-sm">Pastas de Conversas</h4>
-                                <Badge variant="secondary" className="text-xs">
-                                    {chatSelections.size}/{chatFolders.length}
-                                </Badge>
-                            </div>
-
-                            {chatFolders.length === 0 ? (
-                                <p className="text-sm text-muted-foreground pl-6">Nenhuma pasta criada ainda</p>
-                            ) : (
-                                <div className="space-y-2 pl-6">
-                                    {chatFolders.map((folder) => (
-                                        <label
-                                            key={folder.id}
-                                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
-                                        >
-                                            <Checkbox
-                                                checked={chatSelections.has(folder.id)}
-                                                onCheckedChange={() => toggleChatFolder(folder.id)}
-                                            />
-                                            <MessageSquare
-                                                className="h-4 w-4 flex-shrink-0"
-                                                style={{ color: folder.color || "#6366f1" }}
-                                            />
-                                            <span className="text-sm">{folder.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
                         <p className="text-xs text-muted-foreground px-1">
-                            O membro só verá os clientes e conversas nas pastas selecionadas.
+                            O membro só verá os clientes nas pastas selecionadas.
                             A pasta "Geral" (sem pasta) é visível para todos.
                         </p>
                     </div>

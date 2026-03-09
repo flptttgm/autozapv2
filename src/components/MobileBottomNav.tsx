@@ -13,6 +13,7 @@ interface MobileBottomNavProps {
     appointments: boolean;
     quotes: boolean;
   };
+  canManageConnections?: boolean;
 }
 
 interface NavItem {
@@ -30,18 +31,18 @@ interface RippleEffect {
   id: number;
 }
 
-const allNavItems: NavItem[] = [
+const allNavItems: (NavItem & { requiresManageConnections?: boolean })[] = [
   { icon: MessageSquare, label: "Conversas", href: "/conversations" },
   { icon: Users, label: "Clientes", href: "/leads" },
   { icon: Menu, label: "Menu", action: "sidebar", isCenter: true },
   { icon: Calendar, label: "Agenda", href: "/appointments", pageKey: "appointments" },
-  { icon: Link2, label: "Conexões", href: "/whatsapp" },
+  { icon: Link2, label: "Conexões", href: "/whatsapp", requiresManageConnections: true },
 ];
 
 // Track already prefetched routes to avoid duplicate imports
 const prefetchedRoutes = new Set<string>();
 
-export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: MobileBottomNavProps) {
+export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages, canManageConnections = true }: MobileBottomNavProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -55,11 +56,13 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
   // Filter nav items based on visibility settings
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
+      // Hide connection items for members without permission
+      if (item.requiresManageConnections && !canManageConnections) return false;
       if (!item.pageKey) return true;
       if (!visiblePages) return true;
       return visiblePages[item.pageKey] ?? true;
     });
-  }, [visiblePages]);
+  }, [visiblePages, canManageConnections]);
 
   // Calculate grid columns based on visible items
   const gridCols = navItems.length;
@@ -78,7 +81,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
   // Update indicator position when route changes
   useEffect(() => {
     const activeIndex = getActiveIndex();
-    
+
     if (activeIndex === -1 || !navRef.current) {
       setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
       return;
@@ -90,7 +93,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
     if (activeButton && navContainer) {
       const navRect = navContainer.getBoundingClientRect();
       const buttonRect = activeButton.getBoundingClientRect();
-      
+
       setIndicatorStyle({
         left: buttonRect.left - navRect.left + (buttonRect.width / 2) - 12,
         width: 24,
@@ -103,9 +106,9 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
   const createRipple = useCallback((event: React.MouseEvent | React.TouchEvent, label: string) => {
     const button = event.currentTarget as HTMLButtonElement;
     const rect = button.getBoundingClientRect();
-    
+
     let x: number, y: number;
-    
+
     if ('touches' in event) {
       x = event.touches[0].clientX - rect.left;
       y = event.touches[0].clientY - rect.top;
@@ -136,7 +139,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
 
   // Measure nav height and set CSS variable for Layout padding
   const navContainerRef = useRef<HTMLElement>(null);
-  
+
   useLayoutEffect(() => {
     if (!isMobile) {
       document.documentElement.style.removeProperty('--mobile-bottom-nav-height');
@@ -152,7 +155,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
     const updateHeight = () => {
       const el = navContainerRef.current;
       if (!el) return;
-      
+
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       raf1 = requestAnimationFrame(() => {
@@ -190,7 +193,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
 
   const handleItemClick = useCallback((item: NavItem, event: React.MouseEvent | React.TouchEvent) => {
     createRipple(event, item.label);
-    
+
     if (item.action === "sidebar") {
       onToggleSidebar();
     } else if (item.href) {
@@ -223,9 +226,9 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
             boxShadow: '0 2px 8px hsl(var(--primary) / 0.4)',
           }}
         />
-        
-        <div 
-          ref={navRef} 
+
+        <div
+          ref={navRef}
           className="grid items-center py-2.5"
           style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
         >
@@ -234,7 +237,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
             const isMenuButton = item.isCenter;
             const isPressed = pressedItem === item.label;
             const itemRipples = ripples[item.label] || [];
-            
+
             return (
               <button
                 key={item.label}
@@ -268,8 +271,8 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
                     key={ripple.id}
                     className={cn(
                       "absolute rounded-full animate-ripple pointer-events-none",
-                      isMenuButton 
-                        ? "bg-white/30" 
+                      isMenuButton
+                        ? "bg-white/30"
                         : "bg-primary/20"
                     )}
                     style={{
@@ -290,7 +293,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
                   isMenuButton && "text-white",
                   active && !isMenuButton && "font-semibold"
                 )}>{item.label}</span>
-                
+
                 {/* Subtle glow effect for menu button - reduced intensity */}
                 {isMenuButton && (
                   <span className="absolute inset-0 rounded-xl bg-emerald-400/10 blur-sm -z-10" />
@@ -300,7 +303,7 @@ export function MobileBottomNav({ onToggleSidebar, sidebarOpen, visiblePages }: 
           })}
         </div>
       </div>
-      
+
       {/* Safe area spacer for iPhone */}
       <div className="h-safe-area-bottom" />
     </nav>

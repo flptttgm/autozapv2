@@ -29,7 +29,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { GlobalSearch } from "@/components/GlobalSearch";
+import { CommandBar } from "@/components/CommandBar";
 import { WorkspaceSwitcher } from "@/components/sidebar/WorkspaceSwitcher";
 import { useAIMode } from "@/hooks/useAIMode";
 import { cn } from "@/lib/utils";
@@ -368,16 +368,16 @@ export const DashboardHeader = ({
           </div>
         )}
 
-        {/* Search — hidden on mobile */}
+        {/* Command Bar — hidden on mobile */}
         <div className="hidden sm:block">
-          <GlobalSearch />
+          <CommandBar />
         </div>
       </div>
 
       {/* ─── Right: Greeting + Actions ─── */}
       <div className="flex items-center gap-1">
-        {/* Greeting — desktop only, hidden on conversations page */}
-        {!location.pathname.startsWith("/conversations") && (
+        {/* Greeting — desktop only, hidden on conversations page and when AI chat is open */}
+        {!location.pathname.startsWith("/conversations") && !aiChatOpen && (
           <div className="hidden md:flex items-center gap-3 min-w-0 mr-3">
             <div className="min-w-0 text-right">
               <p className="text-sm font-semibold text-foreground truncate">

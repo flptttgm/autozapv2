@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { useTranslation } from "react-i18next";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 
 interface AppointmentsSidebarItemProps {
   collapsed: boolean;
@@ -23,6 +24,7 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
+  const { allowedFolderIds } = useLeadFolderAccess();
 
   const isAppointmentsRoute = location.pathname === "/appointments" || location.pathname.startsWith("/appointments/");
   const selectedInstance = searchParams.get("instance");
@@ -32,13 +34,18 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
 
   // Fetch appointments counts grouped by instance (via leads)
   const { data: appointmentsCounts } = useQuery({
-    queryKey: ["appointments-by-instance", profile?.workspace_id],
+    queryKey: ["appointments-by-instance", profile?.workspace_id, allowedFolderIds],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, byInstance: {} };
 
+      // Member with no folders assigned sees 0
+      if (allowedFolderIds !== null && allowedFolderIds.length === 0) {
+        return { total: 0, byInstance: {} };
+      }
+
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, status, leads(whatsapp_instance_id)")
+        .select("id, status, lead_id, leads(whatsapp_instance_id)")
         .eq("workspace_id", profile.workspace_id)
         .neq("status", "cancelled")
         .neq("status", "completed")
@@ -46,12 +53,30 @@ export const AppointmentsSidebarItem = ({ collapsed }: AppointmentsSidebarItemPr
 
       if (error) throw error;
 
+      let filteredData = data || [];
+
+      // Filter by allowed folders for restricted members
+      if (allowedFolderIds !== null && allowedFolderIds.length > 0) {
+        const leadIds = [...new Set(filteredData.map((a: any) => a.lead_id).filter(Boolean))];
+        if (leadIds.length > 0) {
+          const { data: folderRelations } = await supabase
+            .from("lead_folder_relations")
+            .select("lead_id")
+            .in("folder_id", allowedFolderIds)
+            .in("lead_id", leadIds);
+          const allowedLeadIds = new Set((folderRelations || []).map((r: any) => r.lead_id));
+          filteredData = filteredData.filter((a: any) => a.lead_id && allowedLeadIds.has(a.lead_id));
+        } else {
+          filteredData = [];
+        }
+      }
+
       const byInstance: Record<string, number> = {};
       let total = 0;
 
-      data?.forEach((appointment) => {
+      filteredData.forEach((appointment) => {
         total++;
-        const instanceId = appointment.leads?.whatsapp_instance_id;
+        const instanceId = (appointment as any).leads?.whatsapp_instance_id;
         if (instanceId) {
           byInstance[instanceId] = (byInstance[instanceId] || 0) + 1;
         }

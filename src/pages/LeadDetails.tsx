@@ -48,6 +48,7 @@ import { useTerminology } from "@/hooks/useTerminology";
 import { EmojiPickerPopover } from "@/components/conversations/EmojiPickerPopover";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { cn } from "@/lib/utils";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 import { LeadTimeline } from "@/components/leads/LeadTimeline";
 import { CreateAppointmentDialog } from "@/components/leads/CreateAppointmentDialog";
 import { format, formatDistanceToNow } from "date-fns";
@@ -154,6 +155,7 @@ const LeadDetails = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { terminology } = useTerminology();
+  const { allowedFolderIds, isLoading: folderAccessLoading } = useLeadFolderAccess();
 
   // State
   const [noteContent, setNoteContent] = useState("");
@@ -172,6 +174,27 @@ const LeadDetails = () => {
   });
   const [showCreateAppointment, setShowCreateAppointment] = useState(false);
 
+  // ── Check folder access for this lead ──
+  const { data: hasAccess, isLoading: accessCheckLoading } = useQuery({
+    queryKey: ["lead-access-check", id, allowedFolderIds],
+    queryFn: async () => {
+      // Admins have access to everything
+      if (allowedFolderIds === null) return true;
+      // Member with no folders assigned has no access
+      if (allowedFolderIds.length === 0) return false;
+      // Check if the lead belongs to one of the allowed folders
+      const { data, error } = await supabase
+        .from("lead_folder_relations")
+        .select("folder_id")
+        .eq("lead_id", id)
+        .in("folder_id", allowedFolderIds)
+        .limit(1);
+      if (error) return false;
+      return data && data.length > 0;
+    },
+    enabled: !!id && !folderAccessLoading,
+  });
+
   // ── Queries ──
   const { data: lead, isLoading: leadLoading } = useQuery({
     queryKey: ["lead", id],
@@ -184,7 +207,7 @@ const LeadDetails = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!id && hasAccess === true,
   });
 
   const { data: activities, isLoading: activitiesLoading } = useQuery({
@@ -469,13 +492,28 @@ const LeadDetails = () => {
     }
   };
 
-  // ── Loading / Not Found ──
-  if (leadLoading) {
+  // ── Loading / Not Found / Access Denied ──
+  if (leadLoading || folderAccessLoading || accessCheckLoading) {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-12 text-muted-foreground">
             Carregando...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasAccess === false) {
+    return (
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto">
+          <Button variant="ghost" onClick={() => navigate("/leads")} className="mb-4">
+            ← Voltar
+          </Button>
+          <div className="text-center py-12 text-muted-foreground">
+            Você não tem permissão para acessar este {terminology.singularLower}
           </div>
         </div>
       </div>

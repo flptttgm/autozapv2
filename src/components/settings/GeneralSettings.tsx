@@ -1,6 +1,5 @@
 import { TerminologySelector } from "./TerminologySelector";
 import { TimezoneSelector } from "./TimezoneSelector";
-import { SidebarPagesVisibility } from "./SidebarPagesVisibility";
 import { AdminPhoneSettings } from "./AdminPhoneSettings";
 import { ThemeSelector } from "./ThemeSelector";
 import { AgendaSettings } from "./AgendaSettings";
@@ -18,8 +17,6 @@ export const GeneralSettings = () => {
       <TimezoneSelector />
 
       <TerminologySelector />
-
-      <SidebarPagesVisibility />
     </div>
   );
 };

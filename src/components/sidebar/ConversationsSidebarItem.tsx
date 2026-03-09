@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { useConnectedWhatsAppInstances } from "@/hooks/useConnectedWhatsAppInstances";
 import { useTranslation } from "react-i18next";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 
 interface ConversationsSidebarItemProps {
   collapsed: boolean;
@@ -22,6 +23,7 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hasManuallyToggled, setHasManuallyToggled] = useState(false);
+  const { allowedFolderIds } = useLeadFolderAccess();
 
   const isConversationsRoute = location.pathname === "/conversations";
   const selectedInstance = searchParams.get("instance");
@@ -47,23 +49,46 @@ export const ConversationsSidebarItem = ({ collapsed }: ConversationsSidebarItem
 
   // Fetch unread counts grouped by instance
   const { data: unreadCounts } = useQuery({
-    queryKey: ["unread-by-instance", profile?.workspace_id],
+    queryKey: ["unread-by-instance", profile?.workspace_id, allowedFolderIds],
     queryFn: async () => {
       if (!profile?.workspace_id) return { total: 0, byInstance: {} };
 
+      // Member with no folders assigned sees 0
+      if (allowedFolderIds !== null && allowedFolderIds.length === 0) {
+        return { total: 0, byInstance: {} };
+      }
+
       const { data, error } = await supabase
         .from("messages")
-        .select("metadata")
+        .select("metadata, lead_id")
         .eq("workspace_id", profile.workspace_id)
         .eq("direction", "inbound")
         .eq("is_read", false);
 
       if (error) throw error;
 
+      let filteredData = data || [];
+
+      // Filter by allowed folders for restricted members
+      if (allowedFolderIds !== null && allowedFolderIds.length > 0) {
+        const leadIds = [...new Set(filteredData.map((m: any) => m.lead_id).filter(Boolean))];
+        if (leadIds.length > 0) {
+          const { data: folderRelations } = await supabase
+            .from("lead_folder_relations")
+            .select("lead_id")
+            .in("folder_id", allowedFolderIds)
+            .in("lead_id", leadIds);
+          const allowedLeadIds = new Set((folderRelations || []).map((r: any) => r.lead_id));
+          filteredData = filteredData.filter((m: any) => m.lead_id && allowedLeadIds.has(m.lead_id));
+        } else {
+          filteredData = [];
+        }
+      }
+
       const byInstance: Record<string, number> = {};
       let total = 0;
 
-      data?.forEach((msg) => {
+      filteredData.forEach((msg) => {
         const instanceId = (msg.metadata as any)?.instanceId;
         total++;
         if (instanceId) {

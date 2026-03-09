@@ -10,14 +10,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLeadFolderAccess } from "@/hooks/useFolderAccess";
 
 export const UpcomingAppointmentsCard = ({ className }: { className?: string }) => {
     const { profile } = useAuth();
     const navigate = useNavigate();
+    const { allowedFolderIds } = useLeadFolderAccess();
 
     const { data: appointments, isLoading } = useQuery({
-        queryKey: ["upcoming-appointments", profile?.workspace_id],
+        queryKey: ["upcoming-appointments", profile?.workspace_id, allowedFolderIds],
         queryFn: async () => {
+            // If member has folder restrictions but no folders assigned, show nothing
+            if (allowedFolderIds !== null && allowedFolderIds.length === 0) return [];
+
             const { data, error } = await supabase
                 .from("appointments")
                 .select(`
@@ -25,6 +30,7 @@ export const UpcomingAppointmentsCard = ({ className }: { className?: string }) 
           title, 
           start_time, 
           status,
+          lead_id,
           leads (
             id,
             name,
@@ -36,10 +42,37 @@ export const UpcomingAppointmentsCard = ({ className }: { className?: string }) 
                 .gte("start_time", new Date().toISOString())
                 .neq("status", "cancelled")
                 .order("start_time", { ascending: true })
-                .limit(5);
+                .limit(15);
 
             if (error) throw error;
-            return data;
+
+            let filteredData = data || [];
+
+            // Filter by allowed folders for restricted members
+            if (allowedFolderIds !== null && allowedFolderIds.length > 0) {
+                const leadIds = filteredData
+                    .map((a: any) => a.lead_id)
+                    .filter(Boolean);
+
+                if (leadIds.length > 0) {
+                    const { data: folderRelations } = await supabase
+                        .from("lead_folder_relations")
+                        .select("lead_id")
+                        .in("folder_id", allowedFolderIds)
+                        .in("lead_id", leadIds);
+
+                    const allowedLeadIds = new Set(
+                        (folderRelations || []).map((r: any) => r.lead_id)
+                    );
+                    filteredData = filteredData.filter(
+                        (apt: any) => apt.lead_id && allowedLeadIds.has(apt.lead_id)
+                    );
+                } else {
+                    filteredData = [];
+                }
+            }
+
+            return filteredData.slice(0, 5);
         },
         enabled: !!profile?.workspace_id,
     });
