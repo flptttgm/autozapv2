@@ -1220,6 +1220,7 @@ const MemoizedChatContent = memo(function ChatContent({
                                 <AudioMessageBubble
                                   metadata={msg.metadata as any}
                                   content={msg.content}
+                                  direction={msg.direction}
                                 />
                               ) : msg.message_type === "image" ? (
                                 <div className="flex flex-col gap-2">

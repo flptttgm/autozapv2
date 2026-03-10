@@ -8,9 +8,10 @@ import { WaveformAudioPlayer } from "@/components/conversations/WaveformAudioPla
 type AudioMessageBubbleProps = {
   content: string;
   metadata: any;
+  direction?: string;
 };
 
-export function AudioMessageBubble({ content, metadata }: AudioMessageBubbleProps) {
+export function AudioMessageBubble({ content, metadata, direction }: AudioMessageBubbleProps) {
   const initialMediaUrl = typeof metadata?.mediaUrl === "string" ? metadata.mediaUrl : "";
   const audioStoragePath = typeof metadata?.audioStoragePath === "string" ? metadata.audioStoragePath : "";
   const duration = Number(metadata?.duration || 0);
@@ -21,6 +22,9 @@ export function AudioMessageBubble({ content, metadata }: AudioMessageBubbleProp
 
   const canReload = useMemo(() => Boolean(audioStoragePath), [audioStoragePath]);
   const signer = useSignedMediaUrl();
+
+  // Only show transcription state for inbound messages
+  const isInbound = direction === "inbound";
 
   useEffect(() => {
     setMediaUrl(initialMediaUrl);
@@ -83,15 +87,16 @@ export function AudioMessageBubble({ content, metadata }: AudioMessageBubbleProp
       )}
 
       {transcription ? (
-        <div className="text-sm text-muted-foreground italic border-l-2 border-primary/50 pl-2 mt-1">
+        <div className="text-sm italic border-l-2 border-current/30 pl-2 mt-1 opacity-80">
           "{transcription}"
         </div>
-      ) : (
+      ) : isInbound ? (
         <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>Transcrevendo áudio...</span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
+

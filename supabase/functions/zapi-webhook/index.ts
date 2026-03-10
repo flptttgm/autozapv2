@@ -345,24 +345,67 @@ serve(async (req: Request) => {
       }
 
       // 3b. Transcribe audio messages
+      // Download audio inline (Z-API URLs expire quickly) and pass base64 to transcription
       let audioTranscription = '';
       if (messageType === 'audio' && msgMetadata.mediaUrl && insertedMsg?.id) {
-        console.log('[zapi-webhook] 🎤 Invoking audio transcription...');
-        try {
-          const { data: transcribeResult, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
-            body: { audioUrl: msgMetadata.mediaUrl, messageId: insertedMsg.id }
-          });
+        console.log('[zapi-webhook] 🎤 Downloading audio for transcription...');
 
-          if (transcribeError) {
-            console.error('[zapi-webhook] Transcription invoke error:', transcribeError);
-          } else if (transcribeResult?.transcription) {
-            audioTranscription = transcribeResult.transcription;
-            // Use the transcription as the content for AI processing
-            content = `[Transcrição de Áudio]: "${audioTranscription}"`;
-            console.log(`[zapi-webhook] ✅ Audio transcribed: "${audioTranscription.substring(0, 80)}..."`);
+        const MAX_RETRIES = 2;
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            // Download audio while the URL is still fresh
+            const audioResponse = await fetch(msgMetadata.mediaUrl);
+            if (!audioResponse.ok) {
+              console.error(`[zapi-webhook] Audio download failed (attempt ${attempt}/${MAX_RETRIES}): ${audioResponse.status} ${audioResponse.statusText}`);
+              if (attempt < MAX_RETRIES) {
+                await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+                continue;
+              }
+              break;
+            }
+
+            const audioBuffer = await audioResponse.arrayBuffer();
+            const audioBytes = new Uint8Array(audioBuffer);
+
+            // Convert to base64
+            let binaryString = '';
+            for (let i = 0; i < audioBytes.length; i++) {
+              binaryString += String.fromCharCode(audioBytes[i]);
+            }
+            const audioBase64 = btoa(binaryString);
+            const audioMime = (msgMetadata.mimeType || 'audio/ogg').split(';')[0].trim();
+
+            console.log(`[zapi-webhook] 🎤 Audio downloaded (${audioBytes.length} bytes, attempt ${attempt}), invoking transcription...`);
+
+            const { data: transcribeResult, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
+              body: { audioBase64, mimeType: audioMime, messageId: insertedMsg.id }
+            });
+
+            if (transcribeError) {
+              console.error(`[zapi-webhook] Transcription invoke error (attempt ${attempt}/${MAX_RETRIES}):`, transcribeError);
+              if (attempt < MAX_RETRIES) {
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+              }
+            } else if (transcribeResult?.transcription) {
+              audioTranscription = transcribeResult.transcription;
+              content = `[Transcrição de Áudio]: "${audioTranscription}"`;
+              console.log(`[zapi-webhook] ✅ Audio transcribed (attempt ${attempt}): "${audioTranscription.substring(0, 80)}..."`);
+              break; // Success, stop retrying
+            } else {
+              console.error(`[zapi-webhook] Transcription returned empty (attempt ${attempt}/${MAX_RETRIES})`);
+              if (attempt < MAX_RETRIES) {
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+              }
+            }
+          } catch (tErr: any) {
+            console.error(`[zapi-webhook] Transcription error (attempt ${attempt}/${MAX_RETRIES}):`, tErr.message);
+            if (attempt < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, 1000));
+              continue;
+            }
           }
-        } catch (tErr: any) {
-          console.error('[zapi-webhook] Transcription error:', tErr.message);
         }
       }
 

@@ -361,9 +361,13 @@ export const CommandBar = () => {
         return [...searchItems, ...actions, ...navs];
     }, [filteredStaticItems, searchItems]);
 
-    // Reset selected index when items change
+    // Reset selected index when items change (use ref to avoid infinite loop)
+    const prevItemCountRef = useRef(allItems.length);
     useEffect(() => {
-        setSelectedIndex(0);
+        if (prevItemCountRef.current !== allItems.length) {
+            prevItemCountRef.current = allItems.length;
+            setSelectedIndex(0);
+        }
     }, [allItems.length]);
 
     // ─── Keyboard navigation ─────────────────────────────────────

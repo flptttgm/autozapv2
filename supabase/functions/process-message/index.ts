@@ -130,9 +130,18 @@ serve(async (req: Request) => {
         }
 
         // Send the agent's response via WhatsApp
-        await supabase.functions.invoke('send-message', {
-          body: { chat_id, message: agentResult.response, lead_id }
-        });
+        if (audio_transcription && agentResult.response) {
+          // Audio inbound → respond with AUDIO ONLY (no text)
+          console.log('[process-message] 🔊 Sending TTS audio response (audio-only)...');
+          await supabase.functions.invoke('text-to-audio', {
+            body: { text: agentResult.response, lead_id, chat_id, instance_id }
+          });
+        } else {
+          // Text inbound → respond with text
+          await supabase.functions.invoke('send-message', {
+            body: { chat_id, message: agentResult.response, lead_id }
+          });
+        }
 
         return new Response(JSON.stringify({
           status: 'success',
@@ -283,16 +292,32 @@ ${lead.name ? `\n[🟢 ESTILO]\nChame o interlocutor por ${lead.name}.` : ''}`;
   });
   const finalResponse = convertMarkdownToWhatsApp(aiResponse.content);
 
+  const isAudioInbound = processedContent.startsWith('[Transcrição de Áudio]');
+
   // Output & Memory Sync
-  await Promise.all([
-    updateChatMemory(supabase, memory?.id || null, [
+  if (isAudioInbound && finalResponse) {
+    // Audio inbound → respond with AUDIO ONLY (no text)
+    await updateChatMemory(supabase, memory?.id || null, [
       { role: 'user', content: processedContent },
       { role: 'assistant', content: finalResponse }
-    ], memory || { id: '', conversation_history: [], conversation_summary: null, context_flags: {} }, workspaceId, lead_id, chat_id),
-    supabase.functions.invoke('send-message', {
-      body: { chat_id, message: finalResponse, lead_id }
-    })
-  ]);
+    ], memory || { id: '', conversation_history: [], conversation_summary: null, context_flags: {} }, workspaceId, lead_id, chat_id);
+
+    console.log('[process-message] 🔊 Sending TTS audio response (legacy, audio-only)...');
+    await supabase.functions.invoke('text-to-audio', {
+      body: { text: finalResponse, lead_id, chat_id, instance_id: instance?.instance_id }
+    });
+  } else {
+    // Text inbound → respond with text
+    await Promise.all([
+      updateChatMemory(supabase, memory?.id || null, [
+        { role: 'user', content: processedContent },
+        { role: 'assistant', content: finalResponse }
+      ], memory || { id: '', conversation_history: [], conversation_summary: null, context_flags: {} }, workspaceId, lead_id, chat_id),
+      supabase.functions.invoke('send-message', {
+        body: { chat_id, message: finalResponse, lead_id }
+      })
+    ]);
+  }
 
   return new Response(JSON.stringify({ status: 'success', response: finalResponse, engine: 'legacy-ts' }), { headers: corsHeaders });
 }
