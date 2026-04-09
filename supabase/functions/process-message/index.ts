@@ -89,6 +89,20 @@ serve(async (req: Request) => {
       // ─── SUPER AGENT → Python Agent Service (default path) ───
       console.log('[process-message] 🚀 Routing to Super Agent (Python)');
 
+      // Pre-fetch knowledge base context via RAG (Edge Function side)
+      // This ensures KB context is always available even if Python RAG fails
+      let knowledgeContextForAgent = "";
+      try {
+        knowledgeContextForAgent = await searchKnowledgeBase(supabase, workspaceId, processedContent);
+        if (knowledgeContextForAgent) {
+          console.log(`[process-message] 📚 KB context found (${knowledgeContextForAgent.length} chars), sending to Python agent`);
+        } else {
+          console.log('[process-message] 📚 No KB context found via Edge RAG');
+        }
+      } catch (ragError: any) {
+        console.error('[process-message] ⚠️ Edge RAG failed (non-blocking):', ragError.message);
+      }
+
       try {
         const agentResponse = await fetch(`${PYTHON_AGENT_URL}/process`, {
           method: 'POST',
@@ -102,6 +116,7 @@ serve(async (req: Request) => {
             workspace_id: workspaceId,
             message: processedContent,
             instance_id,
+            knowledge_context: knowledgeContextForAgent,
             agent_config: {
               id: superAgent.id,
               agent_type: superAgent.agent_type,

@@ -11,7 +11,7 @@ interface WorkspaceRole {
     canManageTeam: boolean;
     /** True if user can access workspace-level settings (owner + admin) */
     canAccessSettings: boolean;
-    /** True if user can manage workspace config — pages, integrations, billing (owner only) */
+    /** True if user can manage workspace config — pages, integrations, billing (owner + admin) */
     canManageWorkspace: boolean;
     /** True if user can access AI agent settings (owner + admin) */
     canManageAgents: boolean;
@@ -58,7 +58,7 @@ export function useWorkspaceRole(): WorkspaceRole {
         isMember: role === "member",
         canManageTeam: isOwner || role === "admin",
         canAccessSettings: isOwner || role === "admin",
-        canManageWorkspace: isOwner,
+        canManageWorkspace: isOwner || role === "admin",
         canManageAgents: isOwner || role === "admin",
         canManageConnections: isOwner || role === "admin",
         memberId: data?.id || null,
